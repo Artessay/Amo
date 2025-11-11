@@ -1,0 +1,47 @@
+# 模型配置（与Helpful模型一致，可复用基础模型）
+model_cfgs:
+  model_name_or_path: "llava-hf/llava-1.5-7b-hf"
+  model_max_length: 512
+  trust_remote_code: False
+  padding_side: "right"
+
+# 训练配置（超参数可微调）
+train_cfgs:
+  epochs: 3
+  batch_size: 8
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  gradient_checkpointing: True
+  regularization: 0.01
+  eval_strategy: "steps"
+  eval_interval: 100
+  seed: 42
+  processor_kwargs: {}
+
+# 数据配置（关键：替换为Harmless数据集）
+data_cfgs:
+  train_datasets: ["data/harmless_train.jsonl"]  # Harmless训练数据集
+  eval_datasets: ["data/harmless_eval.jsonl"]   # Harmless评估数据集
+  max_samples: -1
+  num_workers: 4
+
+# 日志与保存配置（单独保存路径，避免覆盖）
+logger_cfgs:
+  save_interval: 500
+  output_dir: "output/harmless_reward_model"  # Harmless模型保存路径
+  log_dir: "logs/harmless"
+  report_to: ["tensorboard"]
+
+# DeepSpeed配置（与Helpful模型一致）
+deepspeed:
+  train_batch_size: "auto"
+  train_micro_batch_size_per_gpu: 2
+  zero_optimization:
+    stage: 2
+    offload_optimizer:
+      device: "cpu"
+    offload_param:
+      device: "cpu"
+  gradient_accumulation_steps: "auto"
+  fp16:
+    enabled: True
