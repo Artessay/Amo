@@ -1,4 +1,0 @@
-ans
-res
-ths
-buld
