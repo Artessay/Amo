@@ -1,14 +1,11 @@
 
-MODEL_NAME_OR_PATH="Qwen/Qwen2.5-0.5B-Instruct" # model path
+MODEL_NAME_OR_PATH="~/data/model/Qwen/Qwen3-4B" # model path
 
-TRAIN_DATASETS="../assets/text_to_text/preference" # rm dataset path
+TRAIN_DATASETS="./PKU-SafeRLHF" # rm dataset path
 TRAIN_TEMPLATE="PKUSafeRLHF" # dataset template
 TRAIN_SPLIT="train" # split the dataset
 
-OUTPUT_DIR="$../outputs/qwen_2_5_rm" # output dir
-
-# For wandb online logging
-export WANDB_API_KEY=""
+OUTPUT_DIR="./outputs/Qwen3-4B-SafeRLHF-RM" # output dir
 
 # Source the setup script
 source ./setup.sh
