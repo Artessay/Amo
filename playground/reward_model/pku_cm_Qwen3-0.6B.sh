@@ -2,10 +2,10 @@
 MODEL_NAME_OR_PATH="~/data/model/Qwen/Qwen3-0.6B" # model path
 
 TRAIN_DATASETS="./PKU-SafeRLHF" # rm dataset path
-TRAIN_TEMPLATE="PKUSafeRLHF" # dataset template
+TRAIN_TEMPLATE="PKUSafeRLHF_Cost" # dataset template, see configs/format_dataset.py
 TRAIN_SPLIT="train" # split the dataset
 
-OUTPUT_DIR="./outputs/Qwen3-0.6B-SafeRLHF-RM" # output dir
+OUTPUT_DIR="./outputs/Qwen3-0.6B-SafeRLHF-CM" # output dir
 
 # Source the setup script
 source ./setup.sh
@@ -21,5 +21,4 @@ deepspeed \
      --output_dir ${OUTPUT_DIR} \
      --per_device_train_batch_size 64 \
      --per_device_eval_batch_size 64 \
-     --learning_rate 1e-4 \
      --epochs 1 

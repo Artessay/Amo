@@ -241,6 +241,36 @@ class PKUSafeRLHF(BaseFormatter):
             {'role': 'assistant', 'content': response},
         ], {}
 
+# Amo: PKU-SafeRLHF Cost Model
+@register_template('PKUSafeRLHF_Cost')
+class PKUSafeRLHF_Cost(PKUSafeRLHF):
+    system_prompt: str = ''
+
+    def format_preference_sample(
+        self, raw_sample: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+        metrics = raw_sample['safer_response_id']
+        better_response = raw_sample[f'response_{int(metrics)}']
+        worse_response = raw_sample[f'response_{1-int(metrics)}']
+        prompt = raw_sample['prompt']
+
+        better_conversation = [
+            {'role': 'user', 'content': prompt},
+            {'role': 'assistant', 'content': better_response},
+        ]
+
+        worse_conversation = [
+            {'role': 'user', 'content': prompt},
+            {'role': 'assistant', 'content': worse_response},
+        ]
+
+        meta_info = {
+            'better_response': better_response,
+            'worse_response': worse_response,
+        }
+
+        return better_conversation, worse_conversation, meta_info
+
 
 @register_template('Aligner')
 class Aligner(BaseFormatter):
