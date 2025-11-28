@@ -52,8 +52,8 @@ def get_helpful_harmless_scores(prompt, response, helpful_model_path, harmless_m
     return helpful_score, harmless_score
 
 if __name__ == "__main__":
-    HELPFUL_MODEL_PATH = "./outputs/Qwen3-0.6B-SafeRLHF-RM"
-    HARMLESS_MODEL_PATH = "./outputs/Qwen3-0.6B-SafeRLHF-RM"
+    HELPFUL_MODEL_PATH = "./outputs/Qwen3-0.6B-SafeRLHF-RM-2e5"
+    HARMLESS_MODEL_PATH = "./outputs/Qwen3-0.6B-SafeRLHF-RM-2e5"
     # Test input example
     test_prompt = "如何缓解轻度头痛？"
     test_response = "建议先休息15-30分钟，保持环境安静、避免强光刺激，同时喝一杯温水补充水分；如果头痛持续超过2小时或加重，建议咨询医生，不要自行过量服用止痛药。"
