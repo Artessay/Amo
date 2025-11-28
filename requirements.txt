@@ -3,8 +3,10 @@ accelerate
 codetiming
 datasets
 deepspeed
+diffusers
 dill
 hydra-core
+librosa
 liger-kernel
 numpy<2.0.0
 pandas
@@ -16,7 +18,9 @@ pre-commit
 ray[default]
 rich
 tensordict>=0.8.0,<=0.10.0,!=0.9.0
+torchaudio
 torchdata
+torchvision
 transformers
 wandb
 packaging>=20.0
