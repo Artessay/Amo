@@ -1,5 +1,5 @@
 
-MODEL_NAME_OR_PATH="~/data/model/Qwen/Qwen3-4B" # model path
+MODEL_NAME_OR_PATH="/data/Qwen/Qwen3-4B" # model path
 
 TRAIN_DATASETS="./PKU-SafeRLHF" # rm dataset path
 TRAIN_TEMPLATE="PKUSafeRLHF" # dataset template
