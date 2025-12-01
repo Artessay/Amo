@@ -8,7 +8,11 @@ Aligning LLMs with Multiple Objects
 conda create -n amo python=3.13 -y
 conda activate amo
 
-pip install -e .
+pip install torch==2.8.0
+pip install -e .[vllm]
+
+# Install flash attention 2, you can download it from https://github.com/Dao-AILab/flash-attention/releases
+pip install flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
 ```
 
 Download `nltk` punkt tokenizer.
