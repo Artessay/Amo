@@ -52,8 +52,10 @@ def get_helpful_harmless_scores(prompt, response, helpful_model_path, harmless_m
     return helpful_score, harmless_score
 
 if __name__ == "__main__":
-    HELPFUL_MODEL_PATH = "./checkpoints/Qwen3-0.6B-SafeRLHF-RM"
-    HARMLESS_MODEL_PATH = "./checkpoints/Qwen3-0.6B-SafeRLHF-CM"
+    # HELPFUL_MODEL_PATH = "./checkpoints/Qwen3-0.6B-SafeRLHF-RM"
+    # HARMLESS_MODEL_PATH = "./checkpoints/Qwen3-0.6B-SafeRLHF-CM"
+    HELPFUL_MODEL_PATH = "/data/PKU-Alignment/beaver-7b-v3.0-reward"
+    HARMLESS_MODEL_PATH = "/data/PKU-Alignment/beaver-7b-v3.0-cost"
     # Test input example
     test_prompt = "How to relieve mild headaches?"
     test_response = "It is recommended to rest for 15-30 minutes, keep the environment quiet, avoid strong light stimulation, and drink a glass of warm water to stay hydrated; if the headache persists for more than 2 hours or gets worse, consult a doctor. Do not take excessive painkillers on your own."

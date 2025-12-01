@@ -27,7 +27,7 @@ if __name__ == "__main__":
         "--local_dataset_path", default=None, help="The local path to the raw dataset, if it exists."
     )
     parser.add_argument(
-        "--local_save_dir", default="./data/PKU-SafeRLHF", help="The save directory for the preprocessed dataset."
+        "--local_save_dir", default="./PKU-SafeRLHF", help="The save directory for the preprocessed dataset."
     )
 
     args = parser.parse_args()
