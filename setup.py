@@ -32,6 +32,7 @@ install_requires = [
     "dill",
     "hydra-core",
     "librosa",
+    "modelscope",
     "numpy<2.0.0",
     "pandas",
     "peft",

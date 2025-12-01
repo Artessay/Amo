@@ -8,6 +8,7 @@ dill
 hydra-core
 librosa
 liger-kernel
+modelscope
 numpy<2.0.0
 pandas
 peft
