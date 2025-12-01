@@ -18,6 +18,9 @@ from .dapo import DAPORewardManager
 from .naive import NaiveRewardManager
 from .prime import PrimeRewardManager
 
+# [Amo] 
+from .amo_vanilla import AmoVanillaRewardManager
+
 # Note(haibin.lin): no need to include all reward managers here in case of complicated dependencies
 __all__ = [
     "BatchRewardManager",
@@ -26,6 +29,9 @@ __all__ = [
     "PrimeRewardManager",
     "register",
     "get_reward_manager_cls",
+
+    # [Amo]
+    "AmoVanillaRewardManager",
 ]
 
 # Import experimental reward managers to ensure they are registered

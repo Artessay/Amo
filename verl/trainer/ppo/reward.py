@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import ray
 import torch
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from verl import DataProto
 from verl.utils.reward_score import default_compute_score
@@ -86,8 +86,8 @@ def get_custom_reward_fn(config: DictConfig) -> Optional[RawRewardFn]:
     function_name = reward_fn_config.get("name")
     assert function_name is not None
 
-    module = sys.modules.get("custom_module", None)
-    if module is None:
+    # [Amo] Original implementation for loading reward function
+    def get_single_reward_function(file_path):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Reward function file '{file_path}' not found.")
 
@@ -101,18 +101,29 @@ def get_custom_reward_fn(config: DictConfig) -> Optional[RawRewardFn]:
         except Exception as e:
             raise RuntimeError(f"Error loading module from '{file_path}': {e}") from e
 
-    if not hasattr(module, function_name):
-        raise AttributeError(f"Reward function '{function_name}' not found in '{module.__file__}'.")
+        if not hasattr(module, function_name):
+            raise AttributeError(f"Reward function '{function_name}' not found in '{module.__file__}'.")
 
-    print(f"using customized reward function '{function_name}' from '{module.__file__}'")
-    raw_fn = getattr(module, function_name)
+        print(f"using customized reward function '{function_name}' from '{module.__file__}'")
+        raw_fn = getattr(module, function_name)
 
-    reward_kwargs = dict(reward_fn_config.get("reward_kwargs", {}))
+        reward_kwargs = dict(reward_fn_config.get("reward_kwargs", {}))
 
-    if not inspect.iscoroutinefunction(raw_fn):
-        return partial(_call_with_kwargs, raw_fn, reward_kwargs)
+        if not inspect.iscoroutinefunction(raw_fn):
+            return partial(_call_with_kwargs, raw_fn, reward_kwargs)
+        else:
+            return partial(_call_with_kwargs_async, raw_fn, reward_kwargs)
+
+    # [Amo] Support both single path string and list of paths for multi-objective reward manager
+    if isinstance(file_path, str):
+        return get_single_reward_function(file_path)
+    elif isinstance(file_path, ListConfig):
+        def path_to_reward_key(path: str) -> str:
+            return path.split("/")[-1].split(".")[0]
+        
+        return {path_to_reward_key(fp): get_single_reward_function(fp) for fp in file_path}
     else:
-        return partial(_call_with_kwargs_async, raw_fn, reward_kwargs)
+        raise ValueError(f"Unsupported file_path type: {type(file_path)}")
 
 
 def load_reward_manager(

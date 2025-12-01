@@ -11,6 +11,13 @@ conda activate amo
 pip install -e .
 ```
 
+Download `nltk` punkt tokenizer.
+
+```bash
+pip install nltk
+python -c "import nltk; nltk.download('punkt')"
+```
+
 
 ## Download LLMs from ModelScope
 
