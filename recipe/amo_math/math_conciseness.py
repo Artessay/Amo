@@ -14,3 +14,8 @@ def compute_score(data_source, solution_str, ground_truth, extra_info=None) -> f
     # linear decay from 1.0 to 0.0 as tokens go from 0 to MAX_RESPONSE_LENGTH
     return max(0.0, 1.0 - (num_tokens / MAX_RESPONSE_LENGTH))
 
+if __name__ == "__main__":
+    # Test the function with a sample solution
+    sample_solution = "The answer is 42."
+    score = compute_score("math", sample_solution, "42")
+    print(f"Score for '{sample_solution}': {score}")

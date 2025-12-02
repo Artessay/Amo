@@ -62,7 +62,7 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         already_print_data_sources = {}
 
         # [Amo] vanilla solution: weighted sum of all reward functions
-        weights: list = data.meta_info["weights"]
+        weights: list = data.meta_info["amo_weights"]
 
         for i in range(len(data)):
             data_item = data[i]  # DataProtoItem

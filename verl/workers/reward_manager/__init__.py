@@ -27,11 +27,9 @@ __all__ = [
     "DAPORewardManager",
     "NaiveRewardManager",
     "PrimeRewardManager",
+    "AmoVanillaRewardManager",
     "register",
     "get_reward_manager_cls",
-
-    # [Amo]
-    "AmoVanillaRewardManager",
 ]
 
 # Import experimental reward managers to ensure they are registered

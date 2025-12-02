@@ -344,8 +344,15 @@ class TaskRunner:
         )
         train_sampler = create_rl_sampler(config.data, train_dataset)
 
+        # [Amo] Initialize proper PPO trainer.
+        if True:
+            from verl.trainer.ppo.amo_ray_trainer import AmoRayPPOTrainer
+            trainer_cls = AmoRayPPOTrainer
+        else:
+            trainer_cls = RayPPOTrainer
+
         # Initialize the PPO trainer.
-        trainer = RayPPOTrainer(
+        trainer = trainer_cls(
             config=config,
             tokenizer=tokenizer,
             processor=processor,
