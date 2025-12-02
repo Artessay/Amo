@@ -63,6 +63,7 @@ if __name__ == "__main__":
                 "extra_info": {
                     "split": split,
                     "index": idx,
+                    "question": question,
                 },
             }
             return data

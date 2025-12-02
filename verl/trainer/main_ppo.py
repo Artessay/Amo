@@ -345,9 +345,12 @@ class TaskRunner:
         train_sampler = create_rl_sampler(config.data, train_dataset)
 
         # [Amo] Initialize proper PPO trainer.
-        if True:
-            from verl.trainer.ppo.amo_ray_trainer import AmoRayPPOTrainer
-            trainer_cls = AmoRayPPOTrainer
+        if config.amo_strategy.enable:
+            if config.amo_strategy.method == "vanilla":
+                from verl.trainer.ppo.amo_ray_trainer import AmoRayPPOTrainer
+                trainer_cls = AmoRayPPOTrainer
+            else:
+                raise NotImplementedError(f"Unknown amo strategy: {config.amo_strategy.method}")
         else:
             trainer_cls = RayPPOTrainer
 

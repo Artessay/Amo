@@ -41,7 +41,7 @@ install_requires = [
     "pylatexenc",
     "ray[default]>=2.41.0",
     "rich",
-    "torch==2.8",
+    "torch==2.8.0",
     "torchaudio",
     "torchdata",
     "torchvision",
