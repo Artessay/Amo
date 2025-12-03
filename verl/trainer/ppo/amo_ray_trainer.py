@@ -109,6 +109,7 @@ class AmoRayPPOTrainer(RayPPOTrainer):
             device_name,
         )
 
+        # [Amo] initialize amo_weights tensor
         init_amo_weights = self.config.custom_reward_function.get("amo_weights", [1.0])
         self.amo_weights = torch.tensor(init_amo_weights, dtype=torch.float32)
 

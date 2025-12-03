@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import inspect
+from functools import partial
 
 from verl import DataProto
 from verl.experimental.reward.reward_loop import register
 from verl.experimental.reward.reward_loop.base import RewardLoopManagerBase
-from verl.utils.reward_score import default_compute_score
 
 
 @register("amo_vanilla")
@@ -26,13 +27,22 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
 
     def __init__(self, config, tokenizer, compute_score: dict, reward_router_address=None, reward_model_tokenizer=None):
         super().__init__(config, tokenizer)
-        self.compute_score = compute_score or default_compute_score
-        self.is_async_reward_score = inspect.iscoroutinefunction(self.compute_score)
+
+        self.compute_score = compute_score  # Store the compute_score dict of reward functions
+        assert isinstance(self.compute_score, dict), "In AmoVanillaLoopManager, compute_score should be a dict of reward functions."
+        print(f"[Amo] Using multi-objective reward loop manager with reward functions: {list(self.compute_score.keys())}")
+        
+        self.is_async_reward_score = {
+            reward_fn_name: inspect.iscoroutinefunction(reward_fn) 
+            for reward_fn_name, reward_fn in self.compute_score.items()
+        }
+        print(f"[Amo] Reward functions async status: {self.is_async_reward_score}")
+
         self.reward_router_address = reward_router_address
         self.reward_model_tokenizer = reward_model_tokenizer
 
     async def run_single(self, data: DataProto) -> dict:
-        raise NotImplementedError("AmoVanillaLoopManager only support sync reward score now")
+        raise NotImplementedError("AmoVanillaLoopManager has not been fully implemented.")
     
         assert len(data) == 1, "Only support single data item"
         data_item = data[0]
@@ -53,6 +63,10 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
         extra_info["num_turns"] = num_turns
         extra_info["rollout_reward_scores"] = rollout_reward_scores
 
+        # [Amo] vanilla solution: weighted sum of all reward functions
+        weights: list = data.meta_info["amo_weights"]
+        assert len(weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
+
         response_str = await self.loop.run_in_executor(
             None, lambda: self.tokenizer.decode(valid_response_ids, skip_special_tokens=True)
         )
@@ -65,37 +79,52 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
             if self.reward_router_address is not None
             else {}
         )
-        if self.is_async_reward_score:
-            result = await self.compute_score(
-                data_source=data_source,
-                solution_str=response_str,
-                ground_truth=ground_truth,
-                extra_info=extra_info,
-                **extra_reward_kwargs,
-            )
-        else:
-            result = await self.loop.run_in_executor(
-                None,
-                lambda: self.compute_score(
+
+        # Step 1: Build a list of concurrent tasks (coroutine/sync run_in_executor)
+        tasks = []
+        reward_fn_names = []
+        for reward_fn_name, reward_fn in self.compute_score.items():
+            reward_fn_names.append(reward_fn_name)
+            if self.is_async_reward_score[reward_fn_name]:
+                coro = reward_fn(
                     data_source=data_source,
                     solution_str=response_str,
                     ground_truth=ground_truth,
                     extra_info=extra_info,
                     **extra_reward_kwargs,
-                ),
-            )
+                )
+            else:
+                # Use partial to package parameters to avoid closure issues
+                coro = self.loop.run_in_executor(
+                    None,
+                    partial(
+                        reward_fn,
+                        data_source=data_source,
+                        solution_str=response_str,
+                        ground_truth=ground_truth,
+                        extra_info=extra_info,
+                        **extra_reward_kwargs,
+                    ),
+                )
+            tasks.append(coro)
 
+        # Step 2: Await all task results concurrently
+        results = await asyncio.gather(*tasks)
+
+        # Step 3: Aggregate results
+        individual_scores = []
         reward_extra_info = {}
+        for reward_fn_name, result in zip(reward_fn_names, results):
+            if isinstance(result, dict):
+                score = result["score"]
+                for key, value in result.items():
+                    reward_extra_info[f"{reward_fn_name}_{key}"] = value
+            else:
+                score = result
+                reward_extra_info[reward_fn_name] = score
+            individual_scores.append(score)
 
-        score: float
-        if isinstance(result, dict):
-            score = result["score"]
-            for key, value in result.items():
-                reward_extra_info[key] = value
-        else:
-            score = result
-            reward_extra_info["acc"] = score
-
-        reward = score
+        # [Amo] Step 4: Compute weighted sum
+        reward = sum(w * s for w, s in zip(weights, individual_scores))
 
         return {"reward_score": reward, "reward_extra_info": reward_extra_info}

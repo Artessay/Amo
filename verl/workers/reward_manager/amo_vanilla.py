@@ -16,6 +16,9 @@ from collections import defaultdict
 from typing import Any
 
 import torch
+import asyncio
+import inspect
+from functools import partial
 
 from verl import DataProto
 from verl.workers.reward_manager import register
@@ -39,8 +42,19 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         """
         self.tokenizer = tokenizer  # Store the tokenizer for decoding token IDs
         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
-        self.compute_score = compute_score  # Store the compute_score dict of reward functions
         self.reward_fn_key = reward_fn_key  # Store the key for accessing the data source
+
+        self.compute_score = compute_score  # Store the compute_score dict of reward functions
+        assert isinstance(self.compute_score, dict), "In AmoVanillaLoopManager, compute_score should be a dict of reward functions."
+        print(f"[Amo] Using multi-objective reward loop manager with reward functions: {list(self.compute_score.keys())}")
+        
+        self._loop = None  # Will be set when first async method is called
+        self.is_async_reward_score = {
+            reward_fn_name: inspect.iscoroutinefunction(reward_fn) 
+            for reward_fn_name, reward_fn in self.compute_score.items()
+        }
+        print(f"[Amo] Reward functions async status: {self.is_async_reward_score}")
+
 
     def __call__(self, data: DataProto, return_dict: bool = False) -> torch.Tensor | dict[str, Any]:
         
@@ -53,9 +67,6 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             else:
                 return data.batch["rm_scores"]
         
-        assert isinstance(self.compute_score, dict), "In AmoVanillaRewardManager, compute_score should be a dict of reward functions."
-        print(f"[Amo] Using multi-objective reward manager with reward functions: {list(self.compute_score.keys())}")
-
         reward_tensor = torch.zeros_like(data.batch["responses"], dtype=torch.float32)
         reward_extra_info = defaultdict(list)
 
@@ -91,24 +102,20 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             extra_info["rollout_reward_scores"] = rollout_reward_scores
 
             # [Amo] compute individual scores
-            individual_scores = []
-            for reward_fn_name, reward_fn in self.compute_score.items():
-                score = reward_fn(
+            single_run_item = asyncio.run(
+                self.run_single_async(
                     data_source=data_source,
-                    solution_str=response_str,
+                    response_str=response_str,
                     ground_truth=ground_truth,
                     extra_info=extra_info,
                 )
-                
-                # [Amo] Store the information including original reward
-                if isinstance(score, dict):
-                    individual_score = score["score"]
-                    for key, value in score.items():
-                        reward_extra_info[f"{reward_fn_name}_{key}"].append(value)
-                    individual_scores.append(individual_score)
-                else:
-                    reward_extra_info[reward_fn_name].append(score)
-                    individual_scores.append(score)
+            )
+
+            # [Amo] store individual scores and reward extra info
+            individual_scores = single_run_item["individual_scores"]
+            reward_extra_info_item = single_run_item["reward_extra_info"]
+            for key, value in reward_extra_info_item.items():
+                reward_extra_info[key].append(value)
 
             # [Amo] compute weighted sum
             reward = sum(w * s for w, s in zip(weights, individual_scores))
@@ -136,3 +143,111 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             }
         else:
             return reward_tensor
+
+    def run_single(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
+        """Run the reward model on a single sample.
+
+        Args:
+            data_source: The data source of the sample.
+            response_str: The response string of the sample.
+            ground_truth: The ground truth answer of the sample.
+            extra_info: The extra information of the sample.
+
+        Returns:
+            A dictionary containing the reward tensor and the reward extra information.
+        """
+    
+        # [Amo] compute individual scores
+        individual_scores = []
+        reward_extra_info = {}
+        for reward_fn_name, reward_fn in self.compute_score.items():
+            result = reward_fn(
+                data_source=data_source,
+                solution_str=response_str,
+                ground_truth=ground_truth,
+                extra_info=extra_info,
+            )
+            
+            # [Amo] Store the information including original reward
+            if isinstance(result, dict):
+                score = result["score"]
+                for key, value in result.items():
+                    reward_extra_info[f"{reward_fn_name}_{key}"] = value
+            else:
+                score = result
+                reward_extra_info[reward_fn_name] = result
+            individual_scores.append(score)
+
+        return {
+            "individual_scores": individual_scores,
+            "reward_extra_info": reward_extra_info,
+        }
+    
+    @property
+    def loop(self):
+        """Get the current event loop, lazily initializing if needed."""
+        if self._loop is None:
+            try:
+                self._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # If no event loop is running, get or create one
+                self._loop = asyncio.get_event_loop()
+        return self._loop
+
+    async def run_single_async(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
+        """Run the reward model on a single sample.
+
+        Args:
+            data_source: The data source of the sample.
+            response_str: The response string of the sample.
+            ground_truth: The ground truth answer of the sample.
+            extra_info: The extra information of the sample.
+
+        Returns:
+            A dictionary containing the reward tensor and the reward extra information.
+        """
+    
+        # Step 1: Build a list of concurrent tasks (coroutine/sync run_in_executor)
+        tasks = []
+        for reward_fn_name, reward_fn in self.compute_score.items():
+            if self.is_async_reward_score[reward_fn_name]:
+                coro = reward_fn(
+                    data_source=data_source,
+                    solution_str=response_str,
+                    ground_truth=ground_truth,
+                    extra_info=extra_info,
+                )
+            else:
+                # Use partial to package parameters to avoid closure issues
+                coro = self.loop.run_in_executor(
+                    None,
+                    partial(
+                        reward_fn,
+                        data_source=data_source,
+                        solution_str=response_str,
+                        ground_truth=ground_truth,
+                        extra_info=extra_info,
+                    ),
+                )
+            tasks.append(coro)
+
+        # Step 2: Await all task results concurrently
+        results = await asyncio.gather(*tasks)
+
+        # Step 3: Aggregate results
+        individual_scores = []
+        reward_extra_info = {}
+        for reward_fn_name, result in zip(self.compute_score.keys(), results):
+            if isinstance(result, dict):
+                score = result["score"]
+                for key, value in result.items():
+                    reward_extra_info[f"{reward_fn_name}_{key}"] = value
+            else:
+                score = result
+                reward_extra_info[reward_fn_name] = score
+            individual_scores.append(score)
+
+        return {
+            "individual_scores": individual_scores,
+            "reward_extra_info": reward_extra_info,
+        }
