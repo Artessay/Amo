@@ -16,11 +16,13 @@ REWARD_MANAGER="amo_vanilla"
 REWARD_WEIGHTS="[0.334,0.333,0.333]"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
+EPOCH=50
+
 NUM_NODES=1
 NUM_GPUS_PER_NODE=4
 MICRO_BATCH_SIZE_PER_GPU=8
 
-EPOCH=50
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
