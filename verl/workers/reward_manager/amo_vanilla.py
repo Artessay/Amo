@@ -31,7 +31,7 @@ class AmoVanillaRewardManager(AbstractRewardManager):
 
     def __init__(self, tokenizer, num_examine, compute_score: dict, reward_fn_key="data_source") -> None:
         """
-        Initialize the NaiveRewardManager instance.
+        Initialize the AmoVanillaRewardManager instance.
 
         Args:
             tokenizer: The tokenizer used to decode token IDs into text.
