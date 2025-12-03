@@ -22,7 +22,8 @@ NUM_NODES=1
 NUM_GPUS_PER_NODE=4
 MICRO_BATCH_SIZE_PER_GPU=8
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \

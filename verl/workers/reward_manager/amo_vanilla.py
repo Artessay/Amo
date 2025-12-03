@@ -48,7 +48,6 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         assert isinstance(self.compute_score, dict), "In AmoVanillaLoopManager, compute_score should be a dict of reward functions."
         print(f"[Amo] Using multi-objective reward loop manager with reward functions: {list(self.compute_score.keys())}")
         
-        self._loop = None  # Will be set when first async method is called
         self.is_async_reward_score = {
             reward_fn_name: inspect.iscoroutinefunction(reward_fn) 
             for reward_fn_name, reward_fn in self.compute_score.items()
@@ -182,17 +181,6 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             "individual_scores": individual_scores,
             "reward_extra_info": reward_extra_info,
         }
-    
-    @property
-    def loop(self):
-        """Get the current event loop, lazily initializing if needed."""
-        if self._loop is None:
-            try:
-                self._loop = asyncio.get_running_loop()
-            except RuntimeError:
-                # If no event loop is running, get or create one
-                self._loop = asyncio.get_event_loop()
-        return self._loop
 
     async def run_single_async(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
         """Run the reward model on a single sample.
@@ -219,7 +207,8 @@ class AmoVanillaRewardManager(AbstractRewardManager):
                 )
             else:
                 # Use partial to package parameters to avoid closure issues
-                coro = self.loop.run_in_executor(
+                loop = asyncio.get_running_loop()
+                coro = loop.run_in_executor(
                     None,
                     partial(
                         reward_fn,
