@@ -13,11 +13,13 @@ MODEL_PATH="/data/Qwen/Qwen3-4B"
 
 REWARD_FUNCTION_PATH="$WORKSPACE/recipe/amo_math/math_accuracy.py"
 
+EPOCH=50
+
 NUM_NODES=1
-NUM_GPUS_PER_NODE=4
+NUM_GPUS_PER_NODE=2
 MICRO_BATCH_SIZE_PER_GPU=8
 
-EPOCH=50
+export CUDA_VISIBLE_DEVICES=6,7
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
