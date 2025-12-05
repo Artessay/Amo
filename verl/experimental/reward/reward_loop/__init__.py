@@ -17,13 +17,9 @@ from .dapo import DAPORewardLoopManager
 from .naive import NaiveRewardLoopManager
 from .limited import RateLimitedRewardLoopManager
 
-# [Amo] 
-from .async_amo_vanilla import AmoVanillaLoopManager
-
 __all__ = [
     "DAPORewardLoopManager",
     "NaiveRewardLoopManager",
-    "AmoVanillaLoopManager",
     "RateLimitedRewardLoopManager",
     "register",
     "get_reward_loop_manager_cls",

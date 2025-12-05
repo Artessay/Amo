@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import importlib.util
 import inspect
@@ -19,20 +20,21 @@ import os
 import sys
 import warnings
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import ray
 import torch
-from omegaconf import DictConfig, ListConfig
 
-from verl import DataProto
 from verl.utils.reward_score import default_compute_score
 from verl.utils.transferqueue_utils import tqbridge
-from verl.workers.reward_manager import get_reward_manager_cls
-from verl.workers.reward_manager.abstract import AbstractRewardManager, RawRewardFn
 
 if TYPE_CHECKING:
+    from omegaconf import DictConfig
+
+    from verl import DataProto
     from verl.experimental.reward.reward_loop.base import RewardLoopManagerBase
+    from verl.trainer.config.config import ModuleConfig, RewardManagerConfig
+    from verl.workers.reward_manager.abstract import AbstractRewardManager, RawRewardFn
 else:
     try:
         from verl.experimental.reward.reward_loop.base import RewardLoopManagerBase
@@ -86,8 +88,8 @@ def get_custom_reward_fn(config: DictConfig) -> Optional[RawRewardFn]:
     function_name = reward_fn_config.get("name")
     assert function_name is not None
 
-    # [Amo] Original implementation for loading reward function
-    def get_single_reward_function(file_path):
+    module = sys.modules.get("custom_module", None)
+    if module is None:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Reward function file '{file_path}' not found.")
 
@@ -101,29 +103,18 @@ def get_custom_reward_fn(config: DictConfig) -> Optional[RawRewardFn]:
         except Exception as e:
             raise RuntimeError(f"Error loading module from '{file_path}': {e}") from e
 
-        if not hasattr(module, function_name):
-            raise AttributeError(f"Reward function '{function_name}' not found in '{module.__file__}'.")
+    if not hasattr(module, function_name):
+        raise AttributeError(f"Reward function '{function_name}' not found in '{module.__file__}'.")
 
-        print(f"using customized reward function '{function_name}' from '{module.__file__}'")
-        raw_fn = getattr(module, function_name)
+    print(f"using customized reward function '{function_name}' from '{module.__file__}'")
+    raw_fn = getattr(module, function_name)
 
-        reward_kwargs = dict(reward_fn_config.get("reward_kwargs", {}))
+    reward_kwargs = dict(reward_fn_config.get("reward_kwargs", {}))
 
-        if not inspect.iscoroutinefunction(raw_fn):
-            return partial(_call_with_kwargs, raw_fn, reward_kwargs)
-        else:
-            return partial(_call_with_kwargs_async, raw_fn, reward_kwargs)
-
-    # [Amo] Support both single path string and list of paths for multi-objective reward manager
-    if isinstance(file_path, str):
-        return get_single_reward_function(file_path)
-    elif isinstance(file_path, ListConfig):
-        def path_to_reward_key(path: str) -> str:
-            return path.split("/")[-1].split(".")[0]
-        
-        return {path_to_reward_key(fp): get_single_reward_function(fp) for fp in file_path}
+    if not inspect.iscoroutinefunction(raw_fn):
+        return partial(_call_with_kwargs, raw_fn, reward_kwargs)
     else:
-        raise ValueError(f"Unsupported file_path type: {type(file_path)}")
+        return partial(_call_with_kwargs_async, raw_fn, reward_kwargs)
 
 
 def load_reward_manager(
@@ -147,16 +138,24 @@ def load_reward_manager(
     compute_score = get_custom_reward_fn(config)
     final_compute_score = compute_score
 
-    # The list of pre-defined reward managers are defined in `verl/workers/reward_manager/`:
-    # naive: NaiveRewardManager
-    # prime: PrimeRewardManager
-    # batch: BatchRewardManager
-    # dapo: DAPORewardManager
-    # Note(haibin.lin): For custom reward managers, please make sure they are imported and
-    # registered via `verl.workers.reward_manager.register`
-    # By default reward_manager is set to naive (NaiveRewardManager)
-    reward_manager_name = config.reward_model.get("reward_manager", "naive")
-    reward_manager_cls = get_reward_manager_cls(reward_manager_name)
+    reward_manager_cfg: RewardManagerConfig = config.reward_manager
+    reward_manager_cls: type[AbstractRewardManager]
+    if reward_manager_cfg.source == "register":
+        from verl.workers.reward_manager import get_reward_manager_cls
+
+        reward_manager_cls = get_reward_manager_cls(reward_manager_cfg.name)
+    elif reward_manager_cfg.source == "importlib":
+        from verl.utils.import_utils import load_extern_object
+
+        module_cfg: ModuleConfig | None = reward_manager_cfg.module
+        assert module_cfg is not None and module_cfg.path is not None, (
+            f"Module path is required when {reward_manager_cfg.source=}, but got {module_cfg=}"
+        )
+        reward_manager_cls_name = reward_manager_cfg.name
+        reward_manager_cls = cast(
+            type[AbstractRewardManager],
+            load_extern_object(module_path=module_cfg.path, object_name=reward_manager_cls_name),
+        )
 
     if compute_score is None:
         sandbox_config = config.reward_model.get("sandbox_fusion")
