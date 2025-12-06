@@ -17,6 +17,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 
 import os
 import socket
+import warnings
 
 import hydra
 import ray
@@ -29,7 +30,7 @@ from verl.trainer.ppo.reward import load_reward_manager
 from verl.trainer.ppo.utils import need_critic, need_reference_policy
 from verl.utils.config import validate_config
 from verl.utils.device import is_cuda_available
-from verl.utils.import_utils import load_extern_object
+from verl.utils.import_utils import load_extern_type
 
 
 @hydra.main(config_path="config", config_name="ppo_trainer", version_base=None)
@@ -141,10 +142,7 @@ class TaskRunner:
             return actor_rollout_cls, ray_worker_group_cls
 
         if config.actor_rollout_ref.rollout.mode == "sync":
-            raise ValueError(
-                "Rollout mode 'sync' has been removed. Please set "
-                "`actor_rollout_ref.rollout.mode=async` to use the native server rollout."
-            )
+            warnings.warn("spmd rollout mode is deprecated and will be removed in v0.6.2", stacklevel=2)
 
         if config.actor_rollout_ref.actor.strategy in {"fsdp", "fsdp2"}:
             from verl.workers.fsdp_workers import ActorRolloutRefWorker, AsyncActorRolloutRefWorker
@@ -180,7 +178,7 @@ class TaskRunner:
             if use_legacy_worker_impl in ["auto", "enable"]:
                 from verl.workers.fsdp_workers import CriticWorker
             elif use_legacy_worker_impl == "disable":
-                from verl.workers.engine_workers import CriticWorker
+                from verl.workers.roles import CriticWorker
 
                 print("Using new worker implementation")
             else:
@@ -225,17 +223,17 @@ class TaskRunner:
 
         if config.reward_model.enable:
             use_legacy_worker_impl = config.trainer.get("use_legacy_worker_impl", "auto")
-            if use_legacy_worker_impl in ["auto", "enable", "disable"]:
+            if use_legacy_worker_impl in ["auto", "enable"]:
                 if config.reward_model.strategy in {"fsdp", "fsdp2"}:
                     from verl.workers.fsdp_workers import RewardModelWorker
                 elif config.reward_model.strategy == "megatron":
                     from verl.workers.megatron_workers import RewardModelWorker
                 else:
                     raise NotImplementedError
-            # elif use_legacy_worker_impl == "disable":
-            #     from verl.workers.engine_workers import RewardModelWorker
-            #
-            #     print("Using new worker implementation")
+            elif use_legacy_worker_impl == "disable":
+                from verl.workers.roles import RewardModelWorker
+
+                print("Using new worker implementation")
             else:
                 raise ValueError(f"Invalid use_legacy_worker_impl: {use_legacy_worker_impl}")
 
@@ -346,8 +344,18 @@ class TaskRunner:
         )
         train_sampler = create_rl_sampler(config.data, train_dataset)
 
+        # [Amo] Initialize proper PPO trainer.
+        if config.amo_strategy.enable:
+            if config.amo_strategy.method == "vanilla":
+                from verl.trainer.ppo.amo_ray_trainer import AmoRayPPOTrainer
+                trainer_cls = AmoRayPPOTrainer
+            else:
+                raise NotImplementedError(f"Unknown amo strategy: {config.amo_strategy.method}")
+        else:
+            trainer_cls = RayPPOTrainer
+
         # Initialize the PPO trainer.
-        trainer = RayPPOTrainer(
+        trainer = trainer_cls(
             config=config,
             tokenizer=tokenizer,
             processor=processor,
@@ -388,7 +396,7 @@ def create_rl_dataset(data_paths, data_config, tokenizer, processor, is_train=Tr
     # and if the path to the custom class is provided
     if "custom_cls" in data_config and data_config.custom_cls.get("path", None) is not None:
         # Dynamically load the custom dataset class
-        dataset_cls = load_extern_object(data_config.custom_cls.path, data_config.custom_cls.name)
+        dataset_cls = load_extern_type(data_config.custom_cls.path, data_config.custom_cls.name)
         # Verify that the custom dataset class inherits from torch.utils.data.Dataset
         if not issubclass(dataset_cls, Dataset):
             raise TypeError(
@@ -435,7 +443,7 @@ def create_rl_sampler(data_config, dataset):
     from torchdata.stateful_dataloader.sampler import RandomSampler
 
     if data_config.sampler is not None and data_config.sampler.get("class_path", None) is not None:
-        curriculum_class = load_extern_object(
+        curriculum_class = load_extern_type(
             data_config.sampler.class_path,
             data_config.sampler.class_name,
         )
