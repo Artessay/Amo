@@ -21,4 +21,5 @@ deepspeed \
      --output_dir ${OUTPUT_DIR} \
      --per_device_train_batch_size 32 \
      --per_device_eval_batch_size 32 \
+     --learning_rate 2e-5 \
      --epochs 1 

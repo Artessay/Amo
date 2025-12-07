@@ -401,7 +401,8 @@ class RayPPOTrainer:
             collate_fn=collate_fn,
         )
 
-        assert len(self.train_dataloader) >= 1, "Train dataloader is empty!"
+        # Since drop_last=True, the assertions below will hold if the dataset size is smaller than batch size
+        assert len(self.train_dataloader) >= 1, "Train dataloader is empty!"    
         assert len(self.val_dataloader) >= 1, "Validation dataloader is empty!"
 
         print(
