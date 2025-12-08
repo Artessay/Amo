@@ -1,0 +1,7 @@
+{
+    "model_path": "./checkpoints/Qwen3-0.6B-SafeRLHF-CM",
+    "label_key": "safer_response_id",
+    "accuracy": 0.7405918889294848,
+    "correct": 6081,
+    "total": 8211
+}

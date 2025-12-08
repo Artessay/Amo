@@ -1,0 +1,7 @@
+{
+    "model_path": "/data/PKU-Alignment/beaver-7b-v3.0-reward",
+    "label_key": "better_response_id",
+    "accuracy": 0.618438679819754,
+    "correct": 5078,
+    "total": 8211
+}

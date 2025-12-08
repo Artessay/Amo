@@ -1,0 +1,7 @@
+{
+    "model_path": "/data/PKU-Alignment/beaver-7b-v3.0-cost",
+    "label_key": "safer_response_id",
+    "accuracy": 0.31664839848983073,
+    "correct": 2600,
+    "total": 8211
+}

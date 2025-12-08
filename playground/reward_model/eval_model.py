@@ -112,7 +112,6 @@ if __name__ == "__main__":
     harmless_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-CM"
     # helpful_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-reward"
     # harmless_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-cost"
-
     # Evaluate helpfulness
     helpful_evaluator = RewardEvaluator(helpful_model_path)
     helpful_evaluator.evaluate(
