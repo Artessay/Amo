@@ -52,7 +52,7 @@ class RewardEvaluator:
     def evaluate(
         self,
         label_key, 
-        data_path="./PKU-SafeRLHF/test.json",
+        dataset_name="PKU-SafeRLHF",
         save_results=True,
         results_dir="results"
     ):
@@ -62,7 +62,7 @@ class RewardEvaluator:
         After evaluation, save the results as a json file in results_dir.
         Returns: result_dict (dict)
         """
-        with open(data_path, "r", encoding="utf-8") as f:
+        with open(f"./{dataset_name}/test.json", "r", encoding="utf-8") as f:
             dataset = json.load(f)
         correct = 0
         total = 0
@@ -93,7 +93,7 @@ class RewardEvaluator:
             os.makedirs(results_dir, exist_ok=True)
             result_file = os.path.join(
                 results_dir,
-                f"reward_eval_{os.path.basename(self.model_path)}_{label_key}.json"
+                f"reward_{dataset_name}_{os.path.basename(self.model_path)}_{label_key}.json"
             )
             with open(result_file, "w", encoding="utf-8") as f:
                 json.dump(result_dict, f, ensure_ascii=False, indent=4)
@@ -112,11 +112,12 @@ if __name__ == "__main__":
     harmless_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-CM"
     # helpful_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-reward"
     # harmless_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-cost"
+    
     # Evaluate helpfulness
     helpful_evaluator = RewardEvaluator(helpful_model_path)
     helpful_evaluator.evaluate(
         label_key="better_response_id",
-        data_path="./PKU-SafeRLHF/test.json",
+        dataset_name="PKU-SafeRLHF",
         results_dir="results"
     )
 
@@ -124,6 +125,6 @@ if __name__ == "__main__":
     harmless_evaluator = RewardEvaluator(harmless_model_path)
     harmless_evaluator.evaluate(
         label_key="safer_response_id",
-        data_path="./PKU-SafeRLHF/test.json",
+        dataset_name="PKU-SafeRLHF",
         results_dir="results"
     )
