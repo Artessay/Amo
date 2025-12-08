@@ -38,6 +38,8 @@ pip install modelscope
 modelscope download --model Qwen/Qwen3-0.6B  --local_dir /data/Qwen/Qwen3-0.6B
 modelscope download --model Qwen/Qwen3-4B  --local_dir /data/Qwen/Qwen3-4B
 modelscope download --model Qwen/Qwen3-8B  --local_dir /data/Qwen/Qwen3-8B
+modelscope download --model Qwen/Qwen3-14B  --local_dir /data/Qwen/Qwen3-14B
+modelscope download --model Qwen/Qwen3-32B  --local_dir /data/Qwen/Qwen3-32B
 
 modelscope download --model google/gemma-3-4b-it  --local_dir /data/google/gemma-3-4b-it
 modelscope download --model google/gemma-3-12b-it  --local_dir /data/google/gemma-3-12b-it
