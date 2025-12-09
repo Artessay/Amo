@@ -108,8 +108,10 @@ if __name__ == "__main__":
 
     # helpful_model_path = "./checkpoints/Qwen3-0.6B-SafeRLHF-RM"
     # harmless_model_path = "./checkpoints/Qwen3-0.6B-SafeRLHF-CM"
-    helpful_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-RM"
-    harmless_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-CM"
+    # helpful_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-RM"
+    # harmless_model_path = "./checkpoints/Qwen3-4B-SafeRLHF-CM"
+    helpful_model_path = "./checkpoints/Qwen3-8B-SafeRLHF-RM"
+    harmless_model_path = "./checkpoints/Qwen3-8B-SafeRLHF-CM"
     # helpful_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-reward"
     # harmless_model_path = "/data/PKU-Alignment/beaver-7b-v3.0-cost"
     
