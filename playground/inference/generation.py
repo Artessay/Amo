@@ -37,8 +37,8 @@ def generate(args):
     # read dataset.
     dataframe = pd.read_parquet(data_path)
     prompts = [
-        tokenizer.apply_chat_template(item["prompt"], tokenize=False, add_generation_prompt=True) 
-        for item in dataframe
+        tokenizer.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True) 
+        for prompt in dataframe["prompt"]
     ]
     
     output_list = inference(llm, prompts)
