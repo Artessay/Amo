@@ -6,8 +6,8 @@ echo "Using workspace: $WORKSPACE"
 DATASET="MATH-500"
 
 EXPERIMENTS=(
-    "qwen3-4b"
-    "qwen3-4b_grpo"
+    # "qwen3-4b"
+    # "qwen3-4b_grpo"
     "qwen3-4b_vanilla"
 )
 

@@ -33,6 +33,7 @@ def generate(args):
     output_path = args.output
 
     llm, tokenizer = load_model_and_tokenizer(model_path)
+    print(f"Start inference on {data_path} with {model_path}")
 
     # read dataset.
     dataframe = pd.read_parquet(data_path)
@@ -58,13 +59,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Amo Benchmark")
 
     # pretrain, finetune, continue train
-    parser.add_argument('-d', '--data', type=str, default='data/MATH-500/test.parquet', help='data path')
+    parser.add_argument('-d', '--data', type=str, help='data path')
     
-    parser.add_argument('-m', '--model', type=str, default='/data/Qwen/Qwen3-4B', help='model path')
+    parser.add_argument('-m', '--model', type=str, help='model path')
 
-    parser.add_argument('-o', '--output', type=str, default='results/MATH-500/qwen3-4b.parquet', help='output path')
-    
-    parser.add_argument('-s', '--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('-o', '--output', type=str, help='output path')
 
     args = parser.parse_args()
     print(args)
