@@ -28,13 +28,47 @@ from tqdm import tqdm
 from verl.trainer.ppo.reward import get_custom_reward_fn
 from verl.utils.fs import copy_to_local
 
+def avg_scores_by_fn(score_lst):
+    """
+    Compute average scores for each reward function across all responses.
+
+    Args:
+        score_lst (list of dict): List of score dicts, one for each response.
+
+    Returns:
+        dict: Average scores for each reward function.
+    """
+    # Initialize result dict to store lists of scores for each reward function
+    scores_by_fn = {fn_name: [] for fn_name in score_lst[0].keys()}
+
+    # Collect all scores for each reward function
+    for score_dict in score_lst:
+        for fn_name, score in score_dict.items():
+            scores_by_fn[fn_name].append(score)
+    
+    # Compute average for each reward function
+    avg_scores = {fn_name: np.mean(scores) for fn_name, scores in scores_by_fn.items()}
+    
+    return avg_scores
+
 
 @ray.remote
 def process_item(config, data_source, response_lst, reward_data):
-    reward_fn = get_custom_reward_fn(config)
+    reward_fn_dict: dict = get_custom_reward_fn(config)
     ground_truth = reward_data["ground_truth"]
-    score_lst = [reward_fn(data_source, r, ground_truth) for r in response_lst]
-    return data_source, np.mean(score_lst)
+    
+    assert isinstance(reward_fn_dict, dict), "reward_fn_dict must be a dict"
+
+    def reward_item(data_source, r, ground_truth):
+        score_dict = {}
+        for reward_fn_name, reward_fn in reward_fn_dict.items():
+            score_dict[reward_fn_name] = reward_fn(data_source, r, ground_truth)
+        return score_dict
+    
+    # List of score dicts, one for each response
+    score_lst = [reward_item(data_source, r, ground_truth) for r in response_lst]
+    
+    return data_source, avg_scores_by_fn(score_lst)
 
 
 @hydra.main(config_path="config", config_name="evaluation", version_base=None)
@@ -70,7 +104,7 @@ def main(config):
 
     metric_dict = {}
     for data_source, rewards in data_source_reward.items():
-        metric_dict[f"test_score/{data_source}"] = np.mean(rewards)
+        metric_dict[data_source] = avg_scores_by_fn(rewards)
 
     print(metric_dict)
 
