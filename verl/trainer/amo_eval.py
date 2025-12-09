@@ -18,6 +18,7 @@ The input is a parquet file that contains N generated sequences and (optional) t
 
 from collections import defaultdict
 
+import json
 import hydra
 import numpy as np
 import pandas as pd
@@ -107,6 +108,10 @@ def main(config):
         metric_dict[data_source] = avg_scores_by_fn(rewards)
 
     print(metric_dict)
+
+    save_path = local_path.replace(".parquet", ".json")
+    with open(save_path, "w") as f:
+        json.dump(metric_dict, f, indent=4)
 
 
 if __name__ == "__main__":
