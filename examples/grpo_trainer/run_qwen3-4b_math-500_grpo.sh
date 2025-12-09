@@ -4,7 +4,7 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_grpo_math-500"
-EXPERIMENT_NAME="qwen3-4b"
+EXPERIMENT_NAME="qwen3-4b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
@@ -60,6 +60,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
-    trainer.save_freq=5 \
+    trainer.save_freq=30 \
     trainer.test_freq=5 \
     trainer.total_epochs=$EPOCH $@

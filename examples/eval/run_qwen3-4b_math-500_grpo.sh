@@ -4,7 +4,7 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_grpo_math-500"
-EXPERIMENT_NAME="qwen3-4b_vanilla"
+EXPERIMENT_NAME="qwen3-4b_grpo"
 
 LATEST_STEP=$(cat checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/latest_checkpointed_iteration.txt)
 

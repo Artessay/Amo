@@ -10,7 +10,7 @@ def load_model_and_tokenizer(model_path: str):
 
     # initialize the model
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    llm = LLM(model=model_path, tensor_parallel_size=num_gpus)
+    llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=0.9)
     
     return llm, tokenizer
 
