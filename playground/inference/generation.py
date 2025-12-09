@@ -32,12 +32,15 @@ def generate(args):
     model_path = args.model
     output_path = args.output
 
-    # read dataset.
-    dataframe = pd.read_parquet(data_path)
-    prompts = [item["prompt"] for item in dataframe]
-    
     llm, tokenizer = load_model_and_tokenizer(model_path)
 
+    # read dataset.
+    dataframe = pd.read_parquet(data_path)
+    prompts = [
+        tokenizer.apply_chat_template(item["prompt"], tokenize=False, add_generation_prompt=True) 
+        for item in dataframe
+    ]
+    
     output_list = inference(llm, prompts)
 
     # add to the data frame
