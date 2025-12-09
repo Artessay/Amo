@@ -12,8 +12,11 @@ set -e
 # CHECKPOINT_DIR="./outputs/Qwen3-4B-SafeRLHF-CM/slice_end"
 # OUTPUT_DIR="./checkpoints/Qwen3-4B-SafeRLHF-CM"
 # ---
-CHECKPOINT_DIR="./outputs/Qwen3-8B-SafeRLHF-RM/slice_end"
-OUTPUT_DIR="./checkpoints/Qwen3-8B-SafeRLHF-RM"
+# CHECKPOINT_DIR="./outputs/Qwen3-8B-SafeRLHF-RM/slice_end"
+# OUTPUT_DIR="./checkpoints/Qwen3-8B-SafeRLHF-RM"
+# ---
+CHECKPOINT_DIR="./outputs/Qwen3-8B-SafeRLHF-CM/slice_end"
+OUTPUT_DIR="./checkpoints/Qwen3-8B-SafeRLHF-CM"
 
 python zero_to_fp32.py ${CHECKPOINT_DIR} ${OUTPUT_DIR} --safe_serialization
 cp ${CHECKPOINT_DIR}/*.json ${OUTPUT_DIR}/
