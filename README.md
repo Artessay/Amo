@@ -44,6 +44,7 @@ modelscope download --model Qwen/Qwen3-32B  --local_dir /data/Qwen/Qwen3-32B
 modelscope download --model google/gemma-3-4b-it  --local_dir /data/google/gemma-3-4b-it
 modelscope download --model google/gemma-3-12b-it  --local_dir /data/google/gemma-3-12b-it
 
+modelscope download --model Qwen/Qwen2.5-3B-Instruct  --local_dir /data/Qwen/Qwen2.5-3B-Instruct
 modelscope download --model LLM-Research/Llama-3.2-3B-Instruct  --local_dir /data/meta-llama/Llama-3.2-3B-Instruct
 ```
 

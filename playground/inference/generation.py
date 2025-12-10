@@ -16,7 +16,7 @@ def load_model_and_tokenizer(model_path: str):
 
 def inference(llm: LLM, prompts: list):
     # generate
-    sampling_params = SamplingParams(n=1, max_tokens=4096, seed=42)
+    sampling_params = SamplingParams(n=1, max_tokens=2048, seed=42)
     outputs = llm.generate(prompts, sampling_params)
 
     # convert to text
