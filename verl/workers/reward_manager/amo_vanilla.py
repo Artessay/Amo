@@ -45,8 +45,8 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         self.reward_fn_key = reward_fn_key  # Store the key for accessing the data source
 
         self.compute_score = compute_score  # Store the compute_score dict of reward functions
-        assert isinstance(self.compute_score, dict), "In AmoVanillaLoopManager, compute_score should be a dict of reward functions."
-        print(f"[Amo] Using multi-objective reward loop manager with reward functions: {list(self.compute_score.keys())}")
+        assert isinstance(self.compute_score, dict), "In AmoVanillaRewardManager, compute_score should be a dict of reward functions."
+        print(f"[Amo] Using multi-objective reward manager with reward functions: {list(self.compute_score.keys())}")
         
         self.is_async_reward_score = {
             reward_fn_name: inspect.iscoroutinefunction(reward_fn) 

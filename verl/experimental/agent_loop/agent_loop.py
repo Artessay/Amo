@@ -313,6 +313,10 @@ class AgentLoopWorkerBase:
             trace_config.get("max_samples_per_step_per_worker", None),
         )
 
+        # [Amo] initialize amo_weights tensor
+        init_amo_weights = self.config.custom_reward_function.get("amo_weights", [1.0])
+        self.amo_weights = torch.tensor(init_amo_weights, dtype=torch.float32)
+
     @tqbridge()
     async def generate_sequences(self, batch: DataProto) -> DataProto:
         """Generate sequences from agent loop.
@@ -568,9 +572,15 @@ class AgentLoopWorkerBase:
                 "tool_extra_fields": np.array([output.extra_fields], dtype=object),
             }
 
+            # [Amo] Pass self.amo_weights to reward manager if any
+            meta_info = {
+                "amo_weights": self.amo_weights.tolist(),
+            }
+
             data = DataProto(
                 batch=batch,
                 non_tensor_batch=non_tensor_batch,
+                meta_info=meta_info,    # [Amo] pass meta_info to reward manager
             )
             result = await self.reward_manager_worker.compute_score.remote(data)
             output.reward_score = result["reward_score"]

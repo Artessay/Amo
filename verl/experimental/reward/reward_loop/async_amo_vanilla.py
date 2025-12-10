@@ -62,7 +62,8 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
         extra_info["rollout_reward_scores"] = rollout_reward_scores
 
         # [Amo] vanilla solution: weighted sum of all reward functions
-        weights: list = data.meta_info["amo_weights"]
+        weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
+        print(f"[Amo] Using amo weights: {weights}")
         assert len(weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
 
         response_str = await self.loop.run_in_executor(
