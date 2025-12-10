@@ -22,14 +22,14 @@ from verl.experimental.reward.reward_loop.base import RewardLoopManagerBase
 
 
 @register("amo_vanilla")
-class AmoVanillaLoopManager(RewardLoopManagerBase):
+class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
     """The multi-object reward manager."""
 
     def __init__(self, config, tokenizer, compute_score: dict, reward_router_address=None, reward_model_tokenizer=None):
         super().__init__(config, tokenizer)
 
         self.compute_score = compute_score  # Store the compute_score dict of reward functions
-        assert isinstance(self.compute_score, dict), "In AmoVanillaLoopManager, compute_score should be a dict of reward functions."
+        assert isinstance(self.compute_score, dict), "In AmoVanillaRewardLoopManager, compute_score should be a dict of reward functions."
         print(f"[Amo] Using multi-objective reward loop manager with reward functions: {list(self.compute_score.keys())}")
         
         self.is_async_reward_score = {
@@ -62,9 +62,8 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
         extra_info["rollout_reward_scores"] = rollout_reward_scores
 
         # [Amo] vanilla solution: weighted sum of all reward functions
-        weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
-        print(f"[Amo] Using amo weights: {weights}")
-        assert len(weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
+        amo_weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
+        assert len(amo_weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
 
         response_str = await self.loop.run_in_executor(
             None, lambda: self.tokenizer.decode(valid_response_ids, skip_special_tokens=True)
@@ -124,6 +123,7 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
             individual_scores.append(score)
 
         # [Amo] Step 4: Compute weighted sum
-        reward = sum(w * s for w, s in zip(weights, individual_scores))
+        # print(f"[Amo] amo weights: {amo_weights}, individual_scores: {individual_scores}")
+        reward = sum(w * s for w, s in zip(amo_weights, individual_scores))
 
         return {"reward_score": reward, "reward_extra_info": reward_extra_info}

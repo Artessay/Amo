@@ -18,12 +18,12 @@ from .naive import NaiveRewardLoopManager
 from .limited import RateLimitedRewardLoopManager
 
 # [Amo] 
-from .async_amo_vanilla import AmoVanillaLoopManager
+from .async_amo_vanilla import AmoVanillaRewardLoopManager
 
 __all__ = [
     "DAPORewardLoopManager",
     "NaiveRewardLoopManager",
-    "AmoVanillaLoopManager",
+    "AmoVanillaRewardLoopManager",
     "RateLimitedRewardLoopManager",
     "register",
     "get_reward_loop_manager_cls",
