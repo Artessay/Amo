@@ -63,7 +63,7 @@ python3 -m verl.trainer.main_ppo \
     custom_reward_function.path=$REWARD_FUNCTION_PATH \
     +custom_reward_function.amo_weights=$REWARD_WEIGHTS \
     trainer.critic_warmup=0 \
-    trainer.logger='["console"]' \
+    trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
