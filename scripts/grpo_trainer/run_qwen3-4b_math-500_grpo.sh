@@ -4,32 +4,26 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_grpo_math-500"
-EXPERIMENT_NAME="qwen3-4b_vanilla"
+EXPERIMENT_NAME="qwen3-4b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen3-4B"
 
-AMO_STRATEGY="vanilla"
-REWARD_MANAGER="amo_vanilla"
-REWARD_WEIGHTS="[0.334,0.333,0.333]"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
+REWARD_FUNCTION_PATH="$WORKSPACE/recipe/amo_math/math_accuracy.py"
 
-EPOCH=50
+EPOCH=100
 
 NUM_NODES=1
-NUM_GPUS_PER_NODE=4
+NUM_GPUS_PER_NODE=2
 MICRO_BATCH_SIZE_PER_GPU=8
 
-# export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=6,7
 
-# [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    amo_strategy.enable=True \
-    amo_strategy.method=$AMO_STRATEGY \
+    amo_strategy.enable=False \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=100 \
@@ -60,9 +54,6 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
-    reward_model.reward_manager=$REWARD_MANAGER \
-    custom_reward_function.path=$REWARD_FUNCTION_PATH \
-    +custom_reward_function.amo_weights=$REWARD_WEIGHTS \
     trainer.critic_warmup=0 \
     trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \

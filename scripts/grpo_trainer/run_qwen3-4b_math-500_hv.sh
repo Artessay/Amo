@@ -16,7 +16,7 @@ REWARD_MANAGER="amo_hv"
 REWARD_WEIGHTS="[0.334,0.333,0.333]"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
-EPOCH=50
+EPOCH=100
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=4
