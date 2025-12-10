@@ -38,7 +38,12 @@ def generate(args):
     # read dataset.
     dataframe = pd.read_parquet(data_path)
     prompts = [
-        tokenizer.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True) 
+        tokenizer.apply_chat_template(
+            prompt, 
+            tokenize=False, 
+            add_generation_prompt=True,
+            enable_thinking=False,
+        ) 
         for prompt in dataframe["prompt"]
     ]
     
