@@ -1,6 +1,6 @@
 import nltk
 
-MAX_RESPONSE_LENGTH = 4096
+MAX_RESPONSE_LENGTH = 2048
 
 def count_tokens(text: str) -> int:
     """Count the number of tokens in the given text."""

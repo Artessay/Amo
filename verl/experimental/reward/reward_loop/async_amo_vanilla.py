@@ -42,8 +42,6 @@ class AmoVanillaLoopManager(RewardLoopManagerBase):
         self.reward_model_tokenizer = reward_model_tokenizer
 
     async def run_single(self, data: DataProto) -> dict:
-        raise NotImplementedError("AmoVanillaLoopManager has not been fully implemented.")
-    
         assert len(data) == 1, "Only support single data item"
         data_item = data[0]
         response_ids = data_item.batch["responses"]

@@ -3,20 +3,20 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_math-500"
-EXPERIMENT_NAME="qwen3-4b_vanilla"
+PROJECT_NAME="amo_grpo_math-lighteval"
+EXPERIMENT_NAME="gemma3-4b_vanilla"
 
-TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
+TRAIN_FILES="$WORKSPACE/data/MATH-lighteval/train.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
 
-MODEL_PATH="/data/Qwen/Qwen3-4B"
+MODEL_PATH="/data/google/gemma-3-4b-it"
 
 AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_vanilla"
 REWARD_WEIGHTS="[0.334,0.333,0.333]"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
-EPOCH=100
+EPOCH=50
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=4
@@ -63,11 +63,11 @@ python3 -m verl.trainer.main_ppo \
     custom_reward_function.path=$REWARD_FUNCTION_PATH \
     +custom_reward_function.amo_weights=$REWARD_WEIGHTS \
     trainer.critic_warmup=0 \
-    trainer.logger='["console"]' \
+    trainer.logger='["console","wandb"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
-    trainer.save_freq=30 \
+    trainer.save_freq=5 \
     trainer.test_freq=5 \
     trainer.total_epochs=$EPOCH $@
