@@ -61,13 +61,43 @@ class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
         extra_info["num_turns"] = num_turns
         extra_info["rollout_reward_scores"] = rollout_reward_scores
 
+        response_str = await self.loop.run_in_executor(
+            None, lambda: self.tokenizer.decode(valid_response_ids, skip_special_tokens=True)
+        )
+
         # [Amo] vanilla solution: weighted sum of all reward functions
         amo_weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
         assert len(amo_weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
 
-        response_str = await self.loop.run_in_executor(
-            None, lambda: self.tokenizer.decode(valid_response_ids, skip_special_tokens=True)
+        # [Amo] compute reward for single item
+        reward_result = await self.compute_individual_reward(
+            data_source=data_source,
+            response_str=response_str,
+            ground_truth=ground_truth,
+            extra_info=extra_info,
         )
+        individual_scores = reward_result["individual_scores"]
+        reward_extra_info = reward_result["reward_extra_info"]
+
+        # [Amo] Step 4: Compute weighted sum
+        # print(f"[Amo] amo weights: {amo_weights}, individual_scores: {individual_scores}")
+        reward = sum(w * s for w, s in zip(amo_weights, individual_scores))
+
+        return {"reward_score": reward, "reward_extra_info": reward_extra_info}
+
+
+    async def compute_individual_reward(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
+        """Run the reward model on a single sample.
+
+        Args:
+            data_source: The data source of the sample.
+            response_str: The response string of the sample.
+            ground_truth: The ground truth answer of the sample.
+            extra_info: The extra information of the sample.
+
+        Returns:
+            A dictionary containing the reward tensor and the reward extra information.
+        """
 
         extra_reward_kwargs = (
             {
@@ -77,12 +107,10 @@ class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
             if self.reward_router_address is not None
             else {}
         )
-
+    
         # Step 1: Build a list of concurrent tasks (coroutine/sync run_in_executor)
         tasks = []
-        reward_fn_names = []
         for reward_fn_name, reward_fn in self.compute_score.items():
-            reward_fn_names.append(reward_fn_name)
             if self.is_async_reward_score[reward_fn_name]:
                 coro = reward_fn(
                     data_source=data_source,
@@ -93,7 +121,8 @@ class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
                 )
             else:
                 # Use partial to package parameters to avoid closure issues
-                coro = self.loop.run_in_executor(
+                loop = asyncio.get_running_loop()
+                coro = loop.run_in_executor(
                     None,
                     partial(
                         reward_fn,
@@ -112,7 +141,7 @@ class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
         # Step 3: Aggregate results
         individual_scores = []
         reward_extra_info = {}
-        for reward_fn_name, result in zip(reward_fn_names, results):
+        for reward_fn_name, result in zip(self.compute_score.keys(), results):
             if isinstance(result, dict):
                 score = result["score"]
                 for key, value in result.items():
@@ -122,8 +151,7 @@ class AmoVanillaRewardLoopManager(RewardLoopManagerBase):
                 reward_extra_info[reward_fn_name] = score
             individual_scores.append(score)
 
-        # [Amo] Step 4: Compute weighted sum
-        # print(f"[Amo] amo weights: {amo_weights}, individual_scores: {individual_scores}")
-        reward = sum(w * s for w, s in zip(amo_weights, individual_scores))
-
-        return {"reward_score": reward, "reward_extra_info": reward_extra_info}
+        return {
+            "individual_scores": individual_scores,
+            "reward_extra_info": reward_extra_info,
+        }
