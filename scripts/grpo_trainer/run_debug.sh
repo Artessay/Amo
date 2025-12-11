@@ -11,6 +11,7 @@ VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen3-4B"
 
+AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_hv"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
@@ -24,7 +25,7 @@ MICRO_BATCH_SIZE_PER_GPU=8
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
-    amo_strategy.method='unknown' \
+    amo_strategy.method=$AMO_STRATEGY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=100 \

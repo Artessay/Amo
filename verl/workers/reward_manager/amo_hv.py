@@ -17,8 +17,6 @@ from typing import Any
 
 import torch
 import asyncio
-import inspect
-from functools import partial
 
 from verl import DataProto
 from verl.workers.reward_manager import register

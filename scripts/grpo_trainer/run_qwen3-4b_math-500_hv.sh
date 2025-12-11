@@ -11,9 +11,8 @@ VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen3-4B"
 
-AMO_STRATEGY="hv"
+AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_hv"
-REWARD_WEIGHTS="[0.334,0.333,0.333]"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
 EPOCH=100
