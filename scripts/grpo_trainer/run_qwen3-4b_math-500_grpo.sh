@@ -17,9 +17,7 @@ EPOCH=100
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=8
-
-export CUDA_VISIBLE_DEVICES=6,7
+MICRO_BATCH_SIZE_PER_GPU=16
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
@@ -31,6 +29,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
+    +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
