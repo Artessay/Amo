@@ -1,4 +1,4 @@
-# Copyright 2024 Bytedance Ltd. and/or its affiliates
+# Copyright 2025 Rihong Qiu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import asyncio
-import inspect
 from functools import partial
 
 from verl import DataProto
@@ -28,7 +27,7 @@ class AmoHVRewardLoopManager(AmoVanillaRewardLoopManager):
     def __init__(self, config, tokenizer, compute_score: dict, reward_router_address=None, reward_model_tokenizer=None):
         super().__init__(config, tokenizer, compute_score, reward_router_address, reward_model_tokenizer)
 
-        
+        self.hv_dict = {}
 
     async def run_single(self, data: DataProto) -> dict:
         assert len(data) == 1, "Only support single data item"
@@ -50,66 +49,23 @@ class AmoHVRewardLoopManager(AmoVanillaRewardLoopManager):
         extra_info["num_turns"] = num_turns
         extra_info["rollout_reward_scores"] = rollout_reward_scores
 
-        # [Amo] vanilla solution: weighted sum of all reward functions
-        amo_weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
-        assert len(amo_weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
-
         response_str = await self.loop.run_in_executor(
             None, lambda: self.tokenizer.decode(valid_response_ids, skip_special_tokens=True)
         )
 
-        extra_reward_kwargs = (
-            {
-                "reward_router_address": self.reward_router_address,
-                "reward_model_tokenizer": self.reward_model_tokenizer,
-            }
-            if self.reward_router_address is not None
-            else {}
+        # [Amo] vanilla solution: weighted sum of all reward functions
+        amo_weights: list = data.meta_info.get("amo_weights", [1.0] * len(self.compute_score))
+        assert len(amo_weights) == len(self.compute_score), "The number of weights should be equal to the number of reward functions."
+
+        # [Amo] compute reward for single item
+        reward_result = await self.compute_individual_reward(
+            data_source=data_source,
+            response_str=response_str,
+            ground_truth=ground_truth,
+            extra_info=extra_info,
         )
-
-        # Step 1: Build a list of concurrent tasks (coroutine/sync run_in_executor)
-        tasks = []
-        reward_fn_names = []
-        for reward_fn_name, reward_fn in self.compute_score.items():
-            reward_fn_names.append(reward_fn_name)
-            if self.is_async_reward_score[reward_fn_name]:
-                coro = reward_fn(
-                    data_source=data_source,
-                    solution_str=response_str,
-                    ground_truth=ground_truth,
-                    extra_info=extra_info,
-                    **extra_reward_kwargs,
-                )
-            else:
-                # Use partial to package parameters to avoid closure issues
-                coro = self.loop.run_in_executor(
-                    None,
-                    partial(
-                        reward_fn,
-                        data_source=data_source,
-                        solution_str=response_str,
-                        ground_truth=ground_truth,
-                        extra_info=extra_info,
-                        **extra_reward_kwargs,
-                    ),
-                )
-            tasks.append(coro)
-
-        # Step 2: Await all task results concurrently
-        results = await asyncio.gather(*tasks)
-
-        # Step 3: Aggregate results
-        individual_scores = []
-        reward_extra_info = {}
-        for reward_fn_name, result in zip(reward_fn_names, results):
-            if isinstance(result, dict):
-                score = result["score"]
-                for key, value in result.items():
-                    reward_extra_info[f"{reward_fn_name}_{key}"] = value
-            else:
-                score = result
-                reward_extra_info[reward_fn_name] = score
-            individual_scores.append(score)
+        individual_scores = reward_result["individual_scores"]
+        reward_extra_info = reward_result["reward_extra_info"]
 
         # [Amo] Step 4: Compute weighted sum
         # print(f"[Amo] amo weights: {amo_weights}, individual_scores: {individual_scores}")
