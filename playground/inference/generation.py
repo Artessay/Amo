@@ -4,12 +4,14 @@ import pandas as pd
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 
+from verl.workers.engine.utils import enable_full_determinism
+
 def load_model_and_tokenizer(model_path: str):
     # Get the number of available GPUs
     num_gpus = torch.cuda.device_count()
 
     # initialize the model
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, fix_mistral_regex=True)
     llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=0.9)
     
     return llm, tokenizer
@@ -28,9 +30,12 @@ def inference(llm: LLM, prompts: list):
 
 
 def generate(args):
+    seed = args.seed
     data_path = args.data
     model_path = args.model
     output_path = args.output
+
+    enable_full_determinism(seed)
 
     llm, tokenizer = load_model_and_tokenizer(model_path)
     print(f"Start inference on {data_path} with {model_path}")
@@ -69,6 +74,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--model', type=str, help='model path')
 
     parser.add_argument('-o', '--output', type=str, help='output path')
+
+    parser.add_argument('-s', '--seed', type=int, default=42, help='random seed')
 
     args = parser.parse_args()
     print(args)
