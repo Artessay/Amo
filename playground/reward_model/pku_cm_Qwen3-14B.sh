@@ -19,7 +19,7 @@ deepspeed \
      --train_datasets ${TRAIN_DATASETS} \
      --train_split ${TRAIN_SPLIT} \
      --output_dir ${OUTPUT_DIR} \
-     --per_device_train_batch_size 1 \
-     --per_device_eval_batch_size 1 \
-     --learning_rate 1e-6 \
+     --per_device_train_batch_size 48 \
+     --per_device_eval_batch_size 48 \
+     --learning_rate 2e-5 \
      --epochs 1 
