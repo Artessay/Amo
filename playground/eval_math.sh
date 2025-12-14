@@ -3,12 +3,13 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-DATASET="MATH-500"
+# DATASET="MATH-500"
+DATASET="MATH-lighteval"
 
 EXPERIMENTS=(
     "qwen3-4b"
-    "qwen3-4b_grpo"
-    "qwen3-4b_vanilla"
+    # "qwen3-4b_grpo"
+    # "qwen3-4b_vanilla"
     "gemma3-4b"
     "llama3-3b"
     "qwen2.5-3b"
