@@ -1,11 +1,11 @@
 
-MODEL_NAME_OR_PATH="/data/Qwen/Qwen3-14B" # model path
+MODEL_NAME_OR_PATH="/data/Qwen/Qwen3-1.7B" # model path
 
 TRAIN_DATASETS="./PKU-SafeRLHF" # rm dataset path
-TRAIN_TEMPLATE="PKUSafeRLHF" # dataset template
+TRAIN_TEMPLATE="PKUSafeRLHF_Cost" # dataset template, see configs/format_dataset.py
 TRAIN_SPLIT="train" # split the dataset
 
-OUTPUT_DIR="./outputs/Qwen3-14B-SafeRLHF-RM" # output dir
+OUTPUT_DIR="./outputs/Qwen3-1.7B-SafeRLHF-CM" # output dir
 
 # Source the setup script
 source ./setup.sh
