@@ -7,11 +7,11 @@ echo "Using workspace: $WORKSPACE"
 DATASET="MATH-lighteval"
 
 EXPERIMENTS=(
-    "qwen3-4b"
-    # "qwen3-4b_grpo"
-    "qwen3-4b_vanilla"
-    "llama3-3b"
-    "qwen2.5-3b"
+    # "qwen3-4b"
+    "qwen3-4b_grpo"
+    # "qwen3-4b_vanilla"
+    # "llama3-3b"
+    # "qwen2.5-3b"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
