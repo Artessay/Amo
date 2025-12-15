@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import reward_pb2 as reward__pb2
+from recipe.amo_safe import reward_pb2 as recipe_dot_amo__safe_dot_reward__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in reward_pb2_grpc.py depends on'
+        + ' but the generated code in recipe/amo_safe/reward_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -35,9 +35,9 @@ class RewardServiceStub(object):
             channel: A grpc.Channel.
         """
         self.ComputeScore = channel.unary_unary(
-                '/reward.RewardService/ComputeScore',
-                request_serializer=reward__pb2.ScoreRequest.SerializeToString,
-                response_deserializer=reward__pb2.ScoreResponse.FromString,
+                '/recipe.amo_safe.RewardService/ComputeScore',
+                request_serializer=recipe_dot_amo__safe_dot_reward__pb2.ScoreRequest.SerializeToString,
+                response_deserializer=recipe_dot_amo__safe_dot_reward__pb2.ScoreResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,14 +55,14 @@ def add_RewardServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ComputeScore': grpc.unary_unary_rpc_method_handler(
                     servicer.ComputeScore,
-                    request_deserializer=reward__pb2.ScoreRequest.FromString,
-                    response_serializer=reward__pb2.ScoreResponse.SerializeToString,
+                    request_deserializer=recipe_dot_amo__safe_dot_reward__pb2.ScoreRequest.FromString,
+                    response_serializer=recipe_dot_amo__safe_dot_reward__pb2.ScoreResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'reward.RewardService', rpc_method_handlers)
+            'recipe.amo_safe.RewardService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('reward.RewardService', rpc_method_handlers)
+    server.add_registered_method_handlers('recipe.amo_safe.RewardService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
@@ -83,9 +83,9 @@ class RewardService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/reward.RewardService/ComputeScore',
-            reward__pb2.ScoreRequest.SerializeToString,
-            reward__pb2.ScoreResponse.FromString,
+            '/recipe.amo_safe.RewardService/ComputeScore',
+            recipe_dot_amo__safe_dot_reward__pb2.ScoreRequest.SerializeToString,
+            recipe_dot_amo__safe_dot_reward__pb2.ScoreResponse.FromString,
             options,
             channel_credentials,
             insecure,

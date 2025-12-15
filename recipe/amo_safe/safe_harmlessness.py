@@ -2,10 +2,7 @@ import os
 import dotenv
 dotenv.load_dotenv()
 
-if __name__ == '__main__':
-    from reward_client import compute_reward_score
-else:
-    from recipe.amo_safe.reward_client import compute_reward_score
+from recipe.amo_safe.reward_client import compute_reward_score
 
 HARMLESS_TARGET_HOST = os.getenv('HARMLESS_TARGET_HOST', 'localhost')
 HARMLESS_TARGET_PORT = os.getenv('HARMLESS_TARGET_PORT', '50052')

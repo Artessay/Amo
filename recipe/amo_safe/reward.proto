@@ -1,5 +1,5 @@
 syntax = "proto3";
-package reward;
+package recipe.amo_safe;
 
 service RewardService {
   rpc ComputeScore (ScoreRequest) returns (ScoreResponse) {}
