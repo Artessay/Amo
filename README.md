@@ -24,6 +24,7 @@ python -c "import nltk; nltk.download('punkt_tab')"
 Install `python-dotenv` to load environment variables from `.env` file.
 
 ```bash
+pip install grpcio-tools
 pip install python-dotenv
 ```
 

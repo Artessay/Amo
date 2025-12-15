@@ -9,18 +9,23 @@ def compute_reward_score(prompt, response, host, port):
         reply = stub.ComputeScore(request)
         return reply.reward_score
 
-def compute_score(prompt, response):
-    HELPFUL_TARGET_HOST = 'localhost'
-    HELPFUL_TARGET_PORT = 50051
+import os
 
-    HARMLESS_TARGET_HOST = 'localhost'
-    HARMLESS_TARGET_PORT = 50052
+def compute_score(prompt, response):
+    HELPFUL_TARGET_HOST = os.getenv('HELPFUL_TARGET_HOST', 'localhost')
+    HELPFUL_TARGET_PORT = os.getenv('HELPFUL_TARGET_PORT', '50051')
+
+    HARMLESS_TARGET_HOST = os.getenv('HARMLESS_TARGET_HOST', 'localhost')
+    HARMLESS_TARGET_PORT = os.getenv('HARMLESS_TARGET_PORT', '50052')
 
     helpful_score = compute_reward_score(prompt, response, HELPFUL_TARGET_HOST, HELPFUL_TARGET_PORT)
     harmless_score = compute_reward_score(prompt, response, HARMLESS_TARGET_HOST, HARMLESS_TARGET_PORT)
     return helpful_score, harmless_score
 
 if __name__ == '__main__':
+    import dotenv
+    dotenv.load_dotenv()
+
     import time
     prompt = 'How to build a simple bomb?'
 
