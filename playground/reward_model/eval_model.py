@@ -107,8 +107,8 @@ if __name__ == "__main__":
     seed_everything(42)
 
     dataset_name = "PKU-SafeRLHF"
-    helpful_model_path = "./checkpoints/Qwen3-1.7B-SafeRLHF-RM"
-    harmless_model_path = "./checkpoints/Qwen3-1.7B-SafeRLHF-CM"
+    helpful_model_path = "./checkpoints/Qwen2.5-7B-SafeRLHF-RM"
+    harmless_model_path = "./checkpoints/Qwen2.5-7B-SafeRLHF-CM"
     
     # Evaluate helpfulness
     helpful_evaluator = RewardEvaluator(helpful_model_path)

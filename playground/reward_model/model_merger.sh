@@ -2,7 +2,8 @@ set -e
 
 # Define model sizes and types to loop through
 MODEL_NAMES=(
-    "Qwen3-0.6B" 
+    "Qwen2.5-7B"
+    # "Qwen3-0.6B"
     # "Qwen3-1.7B" 
     # "Qwen3-4B" 
     # "Qwen3-8B"
@@ -10,7 +11,10 @@ MODEL_NAMES=(
 DATA_NAMES=(
     "SafeRLHF"
 )
-MODEL_TYPES=("RM" "CM")
+MODEL_TYPES=(
+    # "RM"
+    "CM"
+)
 
 # Loop through all models and types
 for DATA_NAME in "${DATA_NAMES[@]}"; do
