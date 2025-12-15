@@ -6,7 +6,7 @@ echo "Using workspace: $WORKSPACE"
 # DATASET="MATH-500"
 DATASETS=(
     "MATH-500" 
-    "MATH-lighteval"
+    # "MATH-lighteval"
 )
 
 EXPERIMENTS=(
@@ -14,7 +14,8 @@ EXPERIMENTS=(
     # "qwen3-4b_grpo"
     # "qwen3-4b_vanilla"
     # "llama3-3b"
-    "qwen2.5-1.5b"
+    # "qwen2.5-1.5b"
+    "qwen2.5-1.5b_vanilla"
     # "qwen2.5-3b"
 )
 

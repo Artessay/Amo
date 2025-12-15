@@ -1,9 +1,11 @@
 set -x
 
-# PROJECT_NAME="amo_grpo_math-500"
-PROJECT_NAME="amo_grpo_math-lighteval"
+PROJECT_NAME="amo_grpo_math-500"
+# PROJECT_NAME="amo_grpo_math-lighteval"
 
-EXPERIMENT_NAME="qwen3-4b_grpo"
+# EXPERIMENT_NAME="qwen2.5-1.5b_grpo"
+EXPERIMENT_NAME="qwen2.5-1.5b_vanilla"
+# EXPERIMENT_NAME="qwen3-4b_grpo"
 # EXPERIMENT_NAME="qwen3-4b_vanilla"
 
 LATEST_STEP=$(cat checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/latest_checkpointed_iteration.txt)
