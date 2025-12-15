@@ -56,18 +56,19 @@ def avg_scores_by_fn(score_lst):
 @ray.remote
 def process_item(config, data_source, response_lst, reward_data):
     reward_fn_dict: dict = get_custom_reward_fn(config)
-    ground_truth = reward_data["ground_truth"]
+    ground_truth = reward_data.get("ground_truth", "")
+    extra_info = reward_data # reward data it self may contain extra info needed by reward functions
     
     assert isinstance(reward_fn_dict, dict), "reward_fn_dict must be a dict"
 
-    def reward_item(data_source, r, ground_truth):
+    def reward_item(data_source, r, ground_truth, extra_info):
         score_dict = {}
         for reward_fn_name, reward_fn in reward_fn_dict.items():
-            score_dict[reward_fn_name] = reward_fn(data_source, r, ground_truth)
+            score_dict[reward_fn_name] = reward_fn(data_source, r, ground_truth, extra_info)
         return score_dict
     
     # List of score dicts, one for each response
-    score_lst = [reward_item(data_source, r, ground_truth) for r in response_lst]
+    score_lst = [reward_item(data_source, r, ground_truth, extra_info) for r in response_lst]
     
     return data_source, avg_scores_by_fn(score_lst)
 
