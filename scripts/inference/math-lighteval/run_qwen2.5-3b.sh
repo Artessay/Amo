@@ -1,6 +1,6 @@
 set -x
 
-WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
+WORKSPACE=$(dirname "$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")")
 echo "Using workspace: $WORKSPACE"
 
 EXPERIMENT_NAME="qwen2.5-3b"
