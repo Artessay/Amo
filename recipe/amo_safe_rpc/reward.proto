@@ -2,7 +2,7 @@ syntax = "proto3";
 package reward;
 
 service RewardService {
-  rpc Score (ScoreRequest) returns (ScoreResponse) {}
+  rpc ComputeScore (ScoreRequest) returns (ScoreResponse) {}
 }
 
 message ScoreRequest {
@@ -11,5 +11,5 @@ message ScoreRequest {
 }
 
 message ScoreResponse {
-  double helpful_score = 1;
+  double reward_score = 1;
 }
