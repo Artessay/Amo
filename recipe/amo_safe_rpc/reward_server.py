@@ -1,6 +1,10 @@
 import torch
 from concurrent import futures
 import grpc
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 import reward_pb2, reward_pb2_grpc
 from align_anything.models.pretrained_model import load_pretrained_models
@@ -54,6 +58,8 @@ class RewardServiceServicer(reward_pb2_grpc.RewardServiceServicer):
             output = self.model(**inputs)
             score = output.end_scores.item()
         
+        logger.info(f'\nPrompt: {prompt}\nResponse: {response}\nScore: {score}')
+
         return score
 
 def serve(model_path: str, port: int):
