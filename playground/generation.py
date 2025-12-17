@@ -1,10 +1,34 @@
 import os
 import torch
+import random
+import numpy as np
 import pandas as pd
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 
-from verl.workers.engine.utils import enable_full_determinism
+def enable_full_determinism(seed: int):
+    """
+    Helper function for reproducibility in distributed training.
+    See https://pytorch.org/docs/stable/notes/randomness.html for details.
+    """
+
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+    os.environ["NCCL_DETERMINISTIC"] = "1"
+    os.environ["FLASH_ATTENTION_DETERMINISTIC"] = "1"
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    
+    # Enable CUDNN deterministic mode
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = False
+
 
 def load_model_and_tokenizer(model_path: str):
     # Get the number of available GPUs

@@ -21,8 +21,13 @@ def merge_peft_model(model_path: str, adapter_path: str, save_path: str):
     print(f"model saved to {save_path}")
 
 if __name__ == '__main__':
-    model_path = "/data/Qwen/Qwen2.5-1.5B-Instruct"
-    adapter_path = "checkpoints/amo_grpo_math-500/qwen2.5-1.5b_vanilla/global_step_300/actor/lora_adapter"
-    save_path = "checkpoints/amo_grpo_math-500/qwen2.5-1.5b_vanilla/merge"
+    import argparse
 
-    merge_peft_model(model_path, adapter_path, save_path)
+    parser = argparse.ArgumentParser(description="Merge LoRA weights into the base model.")
+    parser.add_argument("--model_path", type=str, required=True, help="Path to the base model.")
+    parser.add_argument("--adapter_path", type=str, required=True, help="Path to the PEFT model.")
+    parser.add_argument("--save_path", type=str, required=True, help="Path to save the merged model.")
+
+    args = parser.parse_args()
+
+    merge_peft_model(args.model_path, args.adapter_path, args.save_path)
