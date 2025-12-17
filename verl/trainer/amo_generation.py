@@ -9,6 +9,7 @@ from verl.workers.engine.utils import enable_full_determinism
 def load_model_and_tokenizer(model_path: str):
     # Get the number of available GPUs
     num_gpus = torch.cuda.device_count()
+    print(f"Number of available GPUs: {num_gpus}")
 
     # initialize the model
     tokenizer = AutoTokenizer.from_pretrained(model_path, fix_mistral_regex=True)
@@ -16,9 +17,8 @@ def load_model_and_tokenizer(model_path: str):
     
     return llm, tokenizer
 
-def inference(llm: LLM, prompts: list):
+def inference(llm: LLM, prompts: list, sampling_params: SamplingParams):
     # generate
-    sampling_params = SamplingParams(n=1, max_tokens=2048, seed=42)
     outputs = llm.generate(prompts, sampling_params)
 
     # convert to text
@@ -34,6 +34,7 @@ def generate(args):
     data_path = args.data
     model_path = args.model
     output_path = args.output
+    max_tokens = args.max_tokens
 
     enable_full_determinism(seed)
 
@@ -52,7 +53,8 @@ def generate(args):
         for prompt in dataframe["prompt"]
     ]
     
-    output_list = inference(llm, prompts)
+    sampling_params = SamplingParams(n=1, max_tokens=max_tokens, seed=seed)
+    output_list = inference(llm, prompts, sampling_params)
 
     # add to the data frame
     dataframe["responses"] = output_list
@@ -74,6 +76,8 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--model', type=str, help='model path')
 
     parser.add_argument('-o', '--output', type=str, help='output path')
+
+    parser.add_argument('-t', '--max_tokens', type=int, default=2048, help='max tokens')
 
     parser.add_argument('-s', '--seed', type=int, default=42, help='random seed')
 

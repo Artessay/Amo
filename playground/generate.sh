@@ -25,9 +25,17 @@ REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE
 # Evaluation
 for DATASET in "${DATASETS[@]}"; do
     for EXPERIMENT_NAME in "${EXPERIMENTS[@]}"; do
+        DATASET_NAME="${DATASET,,}"
+        DATA_PATH="$WORKSPACE/data/$DATASET/test.parquet"
+        MODEL_PATH="$WORKSPACE/checkpoints/${PROJECT_PREFIX}_${DATASET_NAME}/${EXPERIMENT_NAME}/merge"
         OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
-        python3 -m verl.trainer.amo_eval \
-            data.path=$OUTPUT_PATH \
-            custom_reward_function.path=$REWARD_FUNCTION_PATH 
+        
+        # python3 -m verl.trainer.amo_generation \
+        python3 verl/trainer/amo_generation.py \
+            --model $MODEL_PATH \
+            --data $DATA_PATH \
+            --output $OUTPUT_PATH \
+            --max_tokens 2048
+
     done
 done

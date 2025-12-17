@@ -17,10 +17,9 @@ REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSP
 
 # Evaluation
 for EXPERIMENT_NAME in "${EXPERIMENTS[@]}"; do
-    DATASET_NAME="${DATASET,,}"
-    # bash $WORKSPACE/scripts/inference/${DATASET_NAME}/run_${EXPERIMENT_NAME}.sh
+    OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
     python3 -m verl.trainer.amo_eval \
-        data.path=$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet \
+        data.path=$OUTPUT_PATH \
         data.reward_model_key=extra_info \
         custom_reward_function.path=$REWARD_FUNCTION_PATH 
 done
