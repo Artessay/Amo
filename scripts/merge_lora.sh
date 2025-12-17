@@ -11,16 +11,17 @@ DATASETS=(
     "PKU-SafeRLHF"
 )
 
-# BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
-# EXPERIMENTS=(
-#     "qwen2.5-1.5b_vanilla"
-# )
-
-BASE_MODEL="/data/Qwen/Qwen3-4B"
+BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
 EXPERIMENTS=(
-    "qwen3-4b_grpo"
-    "qwen3-4b_vanilla"
+    "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_vanilla"
 )
+
+# BASE_MODEL="/data/Qwen/Qwen3-4B"
+# EXPERIMENTS=(
+#     "qwen3-4b_grpo"
+#     "qwen3-4b_vanilla"
+# )
 
 
 # Merge LoRA checkpoints
@@ -36,11 +37,18 @@ for DATASET in "${DATASETS[@]}"; do
         fi
 
         LATEST_STEP=$(cat $STEP_FILE_PATH)
+        ADAPTER_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/lora_adapter"
+        SAVE_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge"
+
+        if [ -d $SAVE_PATH ]; then
+            echo "Save path already exists: $SAVE_PATH"
+            continue
+        fi
 
         python3 playground/lora_merger.py \
             --model_path $BASE_MODEL \
-            --adapter_path ${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/lora_adapter \
-            --save_path ${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge
+            --adapter_path $ADAPTER_PATH \
+            --save_path $SAVE_PATH
 
     done
 done
