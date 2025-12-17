@@ -30,8 +30,8 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=100 \
-    data.max_prompt_length=2048 \
-    data.max_response_length=2048 \
+    data.max_prompt_length=512 \
+    data.max_response_length=512 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \

@@ -6,10 +6,11 @@ echo "Using workspace: $WORKSPACE"
 DATASET="PKU-SafeRLHF" 
 
 EXPERIMENTS=(
-    "qwen2.5-1.5b"
-    "qwen2.5-3b"
-    "llama3-3b"
-    "qwen3-4b"
+    # "qwen2.5-1.5b"
+    "qwen2.5-1.5b_vanilla"
+    # "qwen2.5-3b"
+    # "llama3-3b"
+    # "qwen3-4b"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
@@ -17,7 +18,7 @@ REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSP
 # Evaluation
 for EXPERIMENT_NAME in "${EXPERIMENTS[@]}"; do
     DATASET_NAME="${DATASET,,}"
-    bash $WORKSPACE/scripts/inference/${DATASET_NAME}/run_${EXPERIMENT_NAME}.sh
+    # bash $WORKSPACE/scripts/inference/${DATASET_NAME}/run_${EXPERIMENT_NAME}.sh
     python3 -m verl.trainer.amo_eval \
         data.path=$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet \
         data.reward_model_key=extra_info \
