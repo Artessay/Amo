@@ -1,4 +1,6 @@
-set -x
+# Merge LoRA checkpoints for All datasets
+
+# set -x
 
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"

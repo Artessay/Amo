@@ -8,9 +8,9 @@ DATASET="PKU-SafeRLHF"
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
     "qwen2.5-1.5b_vanilla"
+    
     # "qwen2.5-3b"
     # "llama3-3b"
-    # "qwen3-4b"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"

@@ -6,20 +6,21 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_PREFIX="amo_grpo"
 
 DATASETS=(
-    "MATH-500" 
-    "MATH-lighteval"
-    # "PKU-SafeRLHF"
+    # "MATH-500" 
+    # "MATH-lighteval"
+    "PKU-SafeRLHF"
 )
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
-    # "qwen2.5-1.5b_vanilla"
+    # "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_vanilla"
 
     # "qwen2.5-3b"
 
     # "qwen3-4b"
-    "qwen3-4b_grpo"
-    "qwen3-4b_vanilla"
+    # "qwen3-4b_grpo"
+    # "qwen3-4b_vanilla"
     
     # "llama3-3b"
 )
@@ -47,8 +48,6 @@ for DATASET in "${DATASETS[@]}"; do
         python3 playground/generation.py \
             --model $MODEL_PATH \
             --data $DATA_PATH \
-            --output $OUTPUT_PATH \
-            --max_tokens 2048
-
+            --output $OUTPUT_PATH
     done
 done
