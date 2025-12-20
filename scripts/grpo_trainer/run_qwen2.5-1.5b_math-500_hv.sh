@@ -3,20 +3,19 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_pku-saferlhf"
-EXPERIMENT_NAME="qwen2.5-1.5b_vanilla"
+PROJECT_NAME="amo_grpo_math-500"
+EXPERIMENT_NAME="qwen2.5-1.5b_hv"
 
-TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
-VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 AMO_STRATEGY="vanilla"
-REWARD_MANAGER="amo_vanilla"
-REWARD_WEIGHTS="[0.5,0.5]"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
+REWARD_MANAGER="amo_hv"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
-EPOCH=1
+EPOCH=100
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -29,9 +28,9 @@ python3 -m verl.trainer.main_ppo \
     amo_strategy.method=$AMO_STRATEGY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
-    data.train_batch_size=128 \
-    data.max_prompt_length=512 \
-    data.max_response_length=512 \
+    data.train_batch_size=100 \
+    data.max_prompt_length=2048 \
+    data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
