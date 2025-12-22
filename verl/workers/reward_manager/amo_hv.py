@@ -164,8 +164,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             
             # If uid is missing (e.g., in some custom pipelines), fall back to
             # using the index to ensure deterministic grouping.
-            uid = extra_info.get("split", "data") + "_" + extra_info.get("index", i)
-            print(f"[Amo][HV] Sample {i} uses uid: {uid}")
+            uid = f"{extra_info.get('split', 'data')}_{extra_info.get('index', i)}"
             uids.append(str(uid))
             valid_response_lengths.append(valid_response_length)
             prompt_strs.append(prompt_str)
