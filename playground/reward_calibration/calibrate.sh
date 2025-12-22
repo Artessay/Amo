@@ -9,6 +9,7 @@ MODEL_NAMES=(
     "Qwen2.5-7B-SafeRLHF-RM"
     "Qwen2.5-7B-SafeRLHF-CM"
 )
+SPLIT="test"
 
 for MODEL_NAME in ${MODEL_NAMES[@]}
 do
@@ -18,7 +19,7 @@ do
         --model_path $REWARD_MODEL_PATH \
         --dataset_path $WORKSPACE/playground/reward_model \
         --dataset_name $DATASET_NAME \
-        --split test \
-        --output_path $WORKSPACE/playground/reward_calibration/config/${MODEL_NAME}_calibration.json \
+        --split $SPLIT \
+        --output_path $WORKSPACE/playground/reward_calibration/config/${MODEL_NAME}_${SPLIT}_calibration.json \
         --p 0.1
 done

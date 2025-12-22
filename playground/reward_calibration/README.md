@@ -58,10 +58,10 @@ Use the `playground/reward_calibration/build_calibration.py` script to generate 
 ```bash
 python ./playground/reward_model/build_calibration.py \
     --model_path /path/to/your/trained/rm \
-    --dataset_path ./Amo/data \
+    --dataset_path /path/to/your/dataset \
     --dataset_name PKU-SafeRLHF \
     --split test \
-    --output_path Amo/playground/reward_model/rm_calibration.json \
+    --output_path /path/to/your/output/rm_calibration.json \
     --p 0.1
 ```
 
