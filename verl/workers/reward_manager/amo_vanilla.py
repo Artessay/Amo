@@ -102,7 +102,7 @@ class AmoVanillaRewardManager(AbstractRewardManager):
 
             # [Amo] compute individual scores
             single_run_item = asyncio.run(
-                self.run_single_async(
+                self.compute_individual_reward(
                     data_source=data_source,
                     response_str=response_str,
                     ground_truth=ground_truth,
@@ -143,46 +143,8 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         else:
             return reward_tensor
 
-    def run_single(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
-        """Run the reward model on a single sample.
 
-        Args:
-            data_source: The data source of the sample.
-            response_str: The response string of the sample.
-            ground_truth: The ground truth answer of the sample.
-            extra_info: The extra information of the sample.
-
-        Returns:
-            A dictionary containing the reward tensor and the reward extra information.
-        """
-    
-        # [Amo] compute individual scores
-        individual_scores = []
-        reward_extra_info = {}
-        for reward_fn_name, reward_fn in self.compute_score.items():
-            result = reward_fn(
-                data_source=data_source,
-                solution_str=response_str,
-                ground_truth=ground_truth,
-                extra_info=extra_info,
-            )
-            
-            # [Amo] Store the information including original reward
-            if isinstance(result, dict):
-                score = result["score"]
-                for key, value in result.items():
-                    reward_extra_info[f"{reward_fn_name}_{key}"] = value
-            else:
-                score = result
-                reward_extra_info[reward_fn_name] = result
-            individual_scores.append(score)
-
-        return {
-            "individual_scores": individual_scores,
-            "reward_extra_info": reward_extra_info,
-        }
-
-    async def run_single_async(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
+    async def compute_individual_reward(self, data_source: str, response_str: str, ground_truth: str, extra_info: dict) -> dict:
         """Run the reward model on a single sample.
 
         Args:

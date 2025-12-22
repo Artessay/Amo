@@ -88,7 +88,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
 
             # [Amo] compute individual scores
             single_run_item = asyncio.run(
-                self.run_single_async(
+                self.compute_individual_reward(
                     data_source=data_source,
                     response_str=response_str,
                     ground_truth=ground_truth,
