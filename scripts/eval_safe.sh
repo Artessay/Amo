@@ -6,7 +6,7 @@ echo "Using workspace: $WORKSPACE"
 DATASET="PKU-SafeRLHF" 
 
 EXPERIMENTS=(
-    # "qwen2.5-1.5b"
+    "qwen2.5-1.5b"
     "qwen2.5-1.5b_vanilla"
     
     # "qwen2.5-3b"
