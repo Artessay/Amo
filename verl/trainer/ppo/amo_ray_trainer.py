@@ -110,43 +110,6 @@ class AmoRayPPOTrainer(RayPPOTrainer):
         init_amo_weights = custom_reward_cfg.get("amo_weights", [1.0])
         self.amo_weights = torch.tensor(init_amo_weights, dtype=torch.float32)
 
-        custom_reward_path = custom_reward_cfg.get("path")
-        if custom_reward_path is None:
-            raise ValueError("path must be specified in custom_reward_function for multi-objective reward.")
-        
-        num_objectives = len(custom_reward_path)
-
-        amo_hv_ref_point = custom_reward_cfg.get("amo_hv_ref_point")
-        if amo_hv_ref_point is None:
-            amo_hv_ref_point = [0.0] * num_objectives
-        else:
-            amo_hv_ref_point = list(amo_hv_ref_point)
-            assert len(amo_hv_ref_point) == num_objectives, (
-                f"amo_hv_ref_point length ({len(amo_hv_ref_point)}) must match "
-                f"number of objectives inferred from amo_weights ({num_objectives})."
-            )
-
-        amo_hv_maximize = custom_reward_cfg.get("amo_hv_maximize")
-        if amo_hv_maximize is None:
-            amo_hv_maximize = [True] * num_objectives
-        else:
-            amo_hv_maximize = [bool(x) for x in amo_hv_maximize]
-            assert len(amo_hv_maximize) == num_objectives, (
-                f"amo_hv_maximize length ({len(amo_hv_maximize)}) must match "
-                f"number of objectives inferred from amo_weights ({num_objectives})."
-            )
-
-        amo_hv_buffer_size = custom_reward_cfg.get("amo_hv_buffer_size", 0)
-        if amo_hv_buffer_size is not None:
-            amo_hv_buffer_size = int(amo_hv_buffer_size)
-            if amo_hv_buffer_size < 1:
-                raise ValueError(f"amo_hv_buffer_size must be >= 1, got {amo_hv_buffer_size}")
-
-        # Store as plain Python types for meta_info serialization
-        self.amo_hv_ref_point = [float(x) for x in amo_hv_ref_point]
-        self.amo_hv_maximize = amo_hv_maximize
-        self.amo_hv_buffer_size = amo_hv_buffer_size
-
     def _validate(self):
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
@@ -226,9 +189,6 @@ class AmoRayPPOTrainer(RayPPOTrainer):
 
             # [Amo] add multi-objective reward meta info into meta_info
             test_batch.meta_info["amo_weights"] = self.amo_weights.tolist()
-            test_batch.meta_info["amo_hv_ref_point"] = self.amo_hv_ref_point
-            test_batch.meta_info["amo_hv_maximize"] = self.amo_hv_maximize
-            test_batch.meta_info["amo_hv_buffer_size"] = self.amo_hv_buffer_size
 
             # evaluate using reward_function
             if self.val_reward_fn is None:
@@ -435,9 +395,6 @@ class AmoRayPPOTrainer(RayPPOTrainer):
 
                     # [Amo] add multi-objective reward meta info into meta_info
                     batch.meta_info["amo_weights"] = self.amo_weights.tolist()
-                    batch.meta_info["amo_hv_ref_point"] = self.amo_hv_ref_point
-                    batch.meta_info["amo_hv_maximize"] = self.amo_hv_maximize
-                    batch.meta_info["amo_hv_buffer_size"] = self.amo_hv_buffer_size
 
                     with marked_timer("reward", timing_raw, color="yellow"):
                         # compute reward model score

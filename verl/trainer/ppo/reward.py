@@ -186,6 +186,14 @@ def load_reward_manager(
         else:
             final_compute_score = default_compute_score
 
+    # [Amo] Prepare HV-specific configuration for HV-based reward managers
+    hv_config = None
+    amo_strategy_cfg = config.get("amo_strategy")
+    if amo_strategy_cfg is not None:
+        hv_config = amo_strategy_cfg.get("hv_config", None)
+    if hv_config is not None and reward_manager_cfg.name in ("amo_hv", "AmoHvRewardManager"):
+        reward_kwargs.setdefault("hv_config", hv_config)
+
     # Instantiate and return the reward manager with the specified parameters
     # RewardLoopManagerBase subclasses (like RateLimitedRewardLoopManager) don't accept num_examine
     # while AbstractRewardManager subclasses (like NaiveRewardManager) do

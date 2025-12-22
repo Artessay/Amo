@@ -321,5 +321,29 @@ ray_kwargs:
 
 # configs related to multi-object optimization
 amo_strategy:
+  
+  # Whether to enable multi-objective optimization
   enable: False
+
+  # Method for multi-objective optimization
   method: vanilla
+
+  # Hypervolume (HV) specific configuration
+  hv_config:
+    # Strategy for determining the reference point: "static", "dynamic_batch", or "dynamic_datasource"
+    reference_point_strategy: static
+
+    # Margin to add to the reference point when using dynamic strategies
+    reference_point_margin: 0.1
+
+    # Whether to clip negative HV contributions to zero
+    clip_negative: False
+
+    # Reward scaling mode: "min-max", "z-score", or "none"
+    reward_scaling_mode: none
+
+    # Number of Monte Carlo samples for HV estimation
+    # mc_sample_count: 1024
+
+    # Whether to normalize objective vectors before HV computation
+    normalize_vectors_for_hv: False

@@ -35,13 +35,16 @@ def _hypervolume(points: List[tuple], ref: tuple) -> float:
 
     return hv
 
-def compute_hv_score(buffer: List[tuple], current_point: tuple, maximize: List[bool]):
+def compute_hv_score(buffer: List[tuple], current_point: tuple, maximize: List[bool] = None):
 
     if len(buffer) == 0:
         raise ValueError("`buffer` must contain at least the reference point.")
 
     reference_point = buffer[0]
     prev_points     = buffer[1:]
+
+    if maximize is None:
+        maximize = [True] * len(reference_point)
 
     ref_max   = _to_maximization(reference_point, maximize)
     prev_max  = [_to_maximization(p, maximize) for p in prev_points]
