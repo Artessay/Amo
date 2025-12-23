@@ -180,7 +180,6 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
                 }
             else:
                 return reward_tensor
-        exit(0)
 
         # ------------------------------------------------------------------
         # Group-wise HV computation
