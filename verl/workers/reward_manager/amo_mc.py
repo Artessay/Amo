@@ -24,12 +24,12 @@ from verl.workers.reward_manager.amo_vanilla import AmoVanillaRewardManager
 
 
 
-@register("amo_hv")
-class AmoHvRewardManager(AmoVanillaRewardManager):
-    """Multi-objective reward manager based on hypervolume (HV) contribution.
+@register("amo_mc")
+class AmoMCRewardManager(AmoVanillaRewardManager):
+    """Multi-objective reward manager based on Monte Carlo sampling.
 
-    This manager computes per-sample rewards as the incremental contribution of
-    each sample to the group-wise dominated hypervolume.
+    This manager computes per-sample rewards as the average reward of
+    Monte Carlo sampling.
 
     """
 
@@ -410,17 +410,157 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
         return hv_total, hv_without_each_tensor
 
-    def _hv_recursive_slicing(
-        self,
+        # if dim == 1:
+        #     hv_total = self._hv_1d(vectors, ref_point)
+        #     hv_without_each = []
+        #     for i in range(group_size):
+        #         sub = self._remove_index(vectors, i)
+        #         hv_without_each.append(self._hv_1d(sub, ref_point))
+        #     hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
+        #     return hv_total, hv_without_each_tensor
+
+        # if dim == 2:
+        #     hv_total = self._hv_2d_exact(vectors, ref_point)
+        #     hv_without_each = []
+        #     for i in range(group_size):
+        #         sub = self._remove_index(vectors, i)
+        #         hv_without_each.append(self._hv_2d_exact(sub, ref_point))
+        #     hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
+        #     return hv_total, hv_without_each_tensor
+
+        # # dim > 2: Monte Carlo approximation
+        # return self._hv_mc_contributions(vectors, ref_point, self.mc_sample_count)
+
+    @staticmethod
+    def _hv_1d(points: torch.Tensor, ref_point: torch.Tensor) -> torch.Tensor:
+        """Exact 1D hypervolume for maximization.
+
+        HV is the length of the segment from ref_point to the maximum point.
+        """
+        if points.numel() == 0:
+            return ref_point.new_tensor(0.0)
+        max_val = points[:, 0].max()
+        hv = max_val - ref_point[0]
+        return torch.clamp(hv, min=0.0)
+
+    @staticmethod
+    def _filter_nondominated_2d(points: torch.Tensor) -> torch.Tensor:
+        """Filter dominated points in 2D (maximize both dimensions).
+
+        Returns a tensor of non-dominated points.
+        """
+        if points.numel() == 0:
+            return points
+
+        # Sort by x ascending
+        sorted_idx = torch.argsort(points[:, 0])
+        pts = points[sorted_idx]
+
+        # Scan from right to left to keep points with strictly increasing y
+        nondominated = [pts[-1]]
+        max_y = pts[-1, 1]
+        for i in range(pts.shape[0] - 2, -1, -1):
+            if pts[i, 1] > max_y:
+                nondominated.append(pts[i])
+                max_y = pts[i, 1]
+
+        nondominated_tensor = torch.stack(list(reversed(nondominated)), dim=0)
+        return nondominated_tensor
+
+    @classmethod
+    def _hv_2d_exact(cls, points: torch.Tensor, ref_point: torch.Tensor) -> torch.Tensor:
+        """Exact 2D hypervolume for maximization.
+
+        The algorithm first filters dominated points, then sorts the remaining
+        points by the first dimension in ascending order, and applies the
+        formula:
+
+            HV = sum_k (x_k - x_{k-1}) * (y_k - r_y),
+
+        where x_0 = r_x.
+        """
+        if points.numel() == 0:
+            return ref_point.new_tensor(0.0)
+
+        pts = cls._filter_nondominated_2d(points)
+        if pts.numel() == 0:
+            return ref_point.new_tensor(0.0)
+
+        # Sort by x ascending
+        sorted_idx = torch.argsort(pts[:, 0])
+        pts = pts[sorted_idx]
+
+        hv = ref_point.new_tensor(0.0)
+        prev_x = ref_point[0]
+        r_y = ref_point[1]
+        for k in range(pts.shape[0]):
+            x_k, y_k = pts[k]
+            hv = hv + (x_k - prev_x) * torch.clamp(y_k - r_y, min=0.0)
+            prev_x = x_k
+
+        return torch.clamp(hv, min=0.0)
+    
+    @staticmethod
+    def _hv_3d_exact(points: torch.Tensor, ref_point: torch.Tensor) -> torch.Tensor:
+        """Exact 3D hypervolume for maximization using WFG algorithm.
+
+        Note: This method is not used in the current implementation, as we
+        default to Monte Carlo approximation for dim > 2 for simplicity.
+        """
+        raise NotImplementedError("Exact 3D hypervolume calculation is not implemented.")
+
+    @staticmethod
+    def _hv_mc_contributions(
         points: torch.Tensor,
         ref_point: torch.Tensor,
-    ) -> float:
-        """Compute hypervolume using recursive slicing algorithm."""
-        hv: float = self._hv_recursive_slicing_helper(
-            points.tolist(), 
-            ref_point.tolist()
-        )
-        return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device).clamp(min=0.0)
+        num_samples: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Monte Carlo approximation of HV and per-point HV without each point.
+
+        Args:
+            points: Tensor of shape (group_size, dim).
+            ref_point: Tensor of shape (dim,).
+            num_samples: Number of Monte Carlo samples.
+
+        Returns:
+            (hv_total, hv_without_each) as tensors.
+        """
+        group_size, dim = points.shape
+        if group_size == 0 or dim == 0 or num_samples <= 0:
+            return ref_point.new_tensor(0.0), ref_point.new_zeros(group_size)
+
+        device = points.device
+        # Define sampling box [ref_point, max(points)]
+        max_vals = points.max(dim=0).values
+        side_lengths = torch.clamp(max_vals - ref_point, min=0.0)
+        volume = torch.prod(side_lengths).item()
+        if volume <= 0.0:
+            return ref_point.new_tensor(0.0), ref_point.new_zeros(group_size)
+
+        # Uniform samples in the box
+        rand = torch.rand(num_samples, dim, device=device)
+        samples = ref_point + rand * side_lengths
+
+        # For each sample, check domination by each point
+        # samples: (M, dim), points: (K, dim)
+        # dominated_mask: (M, K)
+        dominated_mask = (samples.unsqueeze(1) <= points.unsqueeze(0)).all(dim=2)
+        dominated_int = dominated_mask.to(torch.int32)
+        dominated_count_per_sample = dominated_int.sum(dim=1, keepdim=True)  # (M, 1)
+
+        # HV(S): count samples dominated by at least one point
+        dominated_any = (dominated_count_per_sample > 0).to(torch.int32)
+        hv_total_count = dominated_any.sum().item()
+        hv_total = points.new_tensor(hv_total_count / num_samples * volume)
+
+        # HV(S \ {i}) using the same samples for lower variance.
+        # For each sample and point i, dominated_minus[i] = (count - mask[i]) > 0
+        dominated_minus_int = (dominated_count_per_sample - dominated_int > 0).to(torch.int32)
+        hv_without_each_counts = dominated_minus_int.sum(dim=0)  # (K,)
+        hv_without_each = hv_without_each_counts.to(points.dtype) / num_samples * volume
+
+        return hv_total, hv_without_each
+
 
     def _hv_recursive_slicing_helper(
         self,
@@ -455,3 +595,14 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             points = [p for p in points if p[0] > p0[0]]
 
         return hv
+
+    def _hv_recursive_slicing(
+        self,
+        points: torch.Tensor,
+        ref_point: torch.Tensor,
+    ) -> float:
+        hv = self._hv_recursive_slicing_helper(
+            points.tolist(), 
+            ref_point.tolist()
+        )
+        return torch.clamp(hv, min=0.0)
