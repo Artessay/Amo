@@ -107,6 +107,8 @@ class AmoRayPPOTrainer(RayPPOTrainer):
 
         # [Amo] initialize multi-objective reward configuration
         custom_reward_cfg = self.config.get("custom_reward_function") or {}
+        print(f"[Amo] custom_reward_cfg: {custom_reward_cfg}")
+        
         init_amo_weights = custom_reward_cfg.get("amo_weights", [1.0])
         self.amo_weights = torch.tensor(init_amo_weights, dtype=torch.float32)
 

@@ -3,28 +3,26 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_math-500"
+PROJECT_NAME="amo_grpo_pku-saferlhf"
 EXPERIMENT_NAME="qwen2.5-1.5b_hv"
 
-TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
+TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
+VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 REWARD_MANAGER="amo_hv"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
 
-EPOCH=100
+EPOCH=1
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=16
-# NUM_GPUS_PER_NODE=4
-# MICRO_BATCH_SIZE_PER_GPU=8
+MICRO_BATCH_SIZE_PER_GPU=32
 
 HV_REFERENCE_POINT_STRATEGY="static" # "dynamic_batch"
-HV_REFERENCE_POINT="[-0.0, -0.0, -0.0]"
-HV_REWARD_SCALING_MODE="none" # "none", "tanh", "min-max", "z-score"
+HV_REFERENCE_POINT="[-0.0, -0.0]"
+HV_REWARD_SCALING_MODE="tanh" # "none", "tanh", "min-max", "z-score"
 HV_ENABLE_CLIP_NEGATIVE=True # False
 
 # [Amo] use LoRA and sync reward score
@@ -36,21 +34,21 @@ python3 -m verl.trainer.main_ppo \
     amo_strategy.hv_config.clip_negative="$HV_ENABLE_CLIP_NEGATIVE" \
     amo_strategy.hv_config.reward_scaling_mode="$HV_REWARD_SCALING_MODE" \
     amo_strategy.hv_config.normalize_vectors_for_hv=False \
-    data.train_files="$TRAIN_FILES" \
-    data.val_files="$VAL_FILES" \
-    data.train_batch_size=100 \
-    data.max_prompt_length=2048 \
-    data.max_response_length=2048 \
+    data.train_files=$TRAIN_FILES \
+    data.val_files=$VAL_FILES \
+    data.train_batch_size=128 \
+    data.max_prompt_length=512 \
+    data.max_response_length=512 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
-    actor_rollout_ref.model.path="$MODEL_PATH" \
+    actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=1e-5 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu="$MICRO_BATCH_SIZE_PER_GPU" \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
@@ -58,23 +56,23 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
-    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu="$MICRO_BATCH_SIZE_PER_GPU" \
+    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.mode=sync \
     actor_rollout_ref.rollout.n=8 \
-    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu="$MICRO_BATCH_SIZE_PER_GPU" \
+    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
-    reward_model.reward_manager="$REWARD_MANAGER" \
-    custom_reward_function.path="$REWARD_FUNCTION_PATH" \
+    reward_model.reward_manager=$REWARD_MANAGER \
+    custom_reward_function.path=$REWARD_FUNCTION_PATH \
     trainer.critic_warmup=0 \
     trainer.logger='["console", "wandb"]' \
-    trainer.project_name="$PROJECT_NAME" \
-    trainer.experiment_name="$EXPERIMENT_NAME" \
-    trainer.n_gpus_per_node="$NUM_GPUS_PER_NODE" \
-    trainer.nnodes="$NUM_NODES" \
+    trainer.project_name=$PROJECT_NAME \
+    trainer.experiment_name=$EXPERIMENT_NAME \
+    trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
+    trainer.nnodes=$NUM_NODES \
     trainer.save_freq=10 \
     trainer.test_freq=5 \
-    trainer.total_epochs="$EPOCH" "$@"
+    trainer.total_epochs=$EPOCH $@

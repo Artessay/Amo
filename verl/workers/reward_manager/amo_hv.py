@@ -224,7 +224,6 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             [0.0 for _ in range(dim)] for _ in range(len(uids))
         ]
         group_sizes = [0 for _ in range(len(uids))]
-        print(f"[Amo][HV] uid2indices: {uid2indices}")
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
