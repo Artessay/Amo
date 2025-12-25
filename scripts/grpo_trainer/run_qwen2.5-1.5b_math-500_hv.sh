@@ -70,7 +70,7 @@ python3 -m verl.trainer.main_ppo \
     reward_model.reward_manager="$REWARD_MANAGER" \
     custom_reward_function.path="$REWARD_FUNCTION_PATH" \
     trainer.critic_warmup=0 \
-    trainer.logger='["console"]' \
+    trainer.logger='["console", "wandb"]' \
     trainer.project_name="$PROJECT_NAME" \
     trainer.experiment_name="$EXPERIMENT_NAME" \
     trainer.n_gpus_per_node="$NUM_GPUS_PER_NODE" \

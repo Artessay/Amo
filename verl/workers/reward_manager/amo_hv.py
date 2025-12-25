@@ -163,19 +163,8 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             data_sources.append(data_source)
             
             # Get stable uid for grouping
-            # First try to get uid from non_tensor_batch
             uid = data_item.non_tensor_batch.get("uid")
             assert uid is not None, "uid should not be None"
-
-            # If uid not found, try to generate a stable uid from extra_info
-            # if uid is None:
-            #     extra_info = data_item.non_tensor_batch.get("extra_info", {})
-            #     # Use split and index to generate stable uid for the same prompt
-            #     split = extra_info.get("split", "default")
-            #     # Try to get index from extra_info, which should be the same for all responses from the same prompt
-            #     index = extra_info.get("index", i)
-            #     # Generate a stable uid based on split and index
-            #     uid = f"{split}_{index}"
             
             uids.append(uid)
             valid_response_lengths.append(valid_response_length)
