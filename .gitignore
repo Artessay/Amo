@@ -107,6 +107,9 @@ ENV/
 # vscode
 .vscode
 
+# trae
+.trae
+
 # Mac
 .DS_Store
 

@@ -162,10 +162,22 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             individual_scores_list.append([float(s) for s in individual_scores])
             data_sources.append(data_source)
             
-            # If uid is missing (e.g., in some custom pipelines), fall back to
-            # using the index to ensure deterministic grouping.
-            uid = f"{extra_info.get('split', 'data')}_{extra_info.get('index', i)}"
-            uids.append(str(uid))
+            # Get stable uid for grouping
+            # First try to get uid from non_tensor_batch
+            uid = data_item.non_tensor_batch.get("uid")
+            assert uid is not None, "uid should not be None"
+
+            # If uid not found, try to generate a stable uid from extra_info
+            # if uid is None:
+            #     extra_info = data_item.non_tensor_batch.get("extra_info", {})
+            #     # Use split and index to generate stable uid for the same prompt
+            #     split = extra_info.get("split", "default")
+            #     # Try to get index from extra_info, which should be the same for all responses from the same prompt
+            #     index = extra_info.get("index", i)
+            #     # Generate a stable uid based on split and index
+            #     uid = f"{split}_{index}"
+            
+            uids.append(uid)
             valid_response_lengths.append(valid_response_length)
             prompt_strs.append(prompt_str)
             response_strs.append(response_str)
@@ -223,6 +235,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             [0.0 for _ in range(dim)] for _ in range(len(uids))
         ]
         group_sizes = [0 for _ in range(len(uids))]
+        print(f"[Amo][HV] uid2indices: {uid2indices}")
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
