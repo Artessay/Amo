@@ -333,6 +333,9 @@ amo_strategy:
     # Strategy for determining the reference point: "static", "dynamic_batch", or "dynamic_datasource"
     reference_point_strategy: static
 
+    # Static reference point for HV computation
+    reference_point: [-1.0, -1.0, -1.0]
+
     # Margin to add to the reference point when using dynamic strategies
     reference_point_margin: 0.1
 
