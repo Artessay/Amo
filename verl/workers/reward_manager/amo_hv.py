@@ -62,6 +62,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         self.reference_point_strategy: str = hv_config.get(
             "reference_point_strategy", "dynamic_batch"
         )
+
         # Only used when strategy == "static"
         self.reference_point = hv_config.get("reference_point", None)
         # Margin to subtract from min objective values when using dynamic reference points
@@ -70,9 +71,6 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         # Reward post-processing
         self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "min-max")
-
-        # HV approximation options
-        self.mc_sample_count: int = int(hv_config.get("mc_sample_count", 2048))
 
         # NOTE: For initial version we do *not* normalize objective vectors for HV
         # calculation to avoid changing the geometry of the dominated region.
