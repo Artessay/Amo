@@ -9,14 +9,15 @@ PROJECT_PREFIX="amo_grpo"
 
 DATASETS=(
     "MATH-500" 
-    "MATH-lighteval"
-    "PKU-SafeRLHF"
+    # "MATH-lighteval"
+    # "PKU-SafeRLHF"
 )
 
 BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
 EXPERIMENTS=(
-    "qwen2.5-1.5b_grpo"
-    "qwen2.5-1.5b_vanilla"
+    # "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b_vanilla"
+    "qwen2.5-1.5b_hv"
 )
 
 # BASE_MODEL="/data/Qwen/Qwen3-4B"
