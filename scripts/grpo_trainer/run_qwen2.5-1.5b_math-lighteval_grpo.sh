@@ -1,5 +1,16 @@
 set -x
 
+# Validate reward variables length consistency
+SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+VALIDATE_SCRIPT="$SCRIPT_DIR/validate_reward_variables.py"
+if [ -f "$VALIDATE_SCRIPT" ]; then
+    python "$VALIDATE_SCRIPT" --check "${BASH_SOURCE[0]}"
+    if [ $? -ne 0 ]; then
+        echo "Validation failed! Exiting..."
+        exit 1
+    fi
+fi
+
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
