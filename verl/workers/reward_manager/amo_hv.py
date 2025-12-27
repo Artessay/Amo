@@ -16,6 +16,7 @@ from collections import defaultdict
 from typing import Any, List
 
 import asyncio
+import threading
 import torch
 
 from verl import DataProto
@@ -23,14 +24,35 @@ from verl.workers.reward_manager import register
 from verl.workers.reward_manager.amo_vanilla import AmoVanillaRewardManager
 
 
-
 @register("amo_hv")
 class AmoHvRewardManager(AmoVanillaRewardManager):
     """Multi-objective reward manager based on hypervolume (HV) contribution.
 
     This manager computes per-sample rewards as the incremental contribution of
-    each sample to the group-wise dominated hypervolume.
+    each sample to the dominated hypervolume.
 
+    By default, contributions are computed within each ``uid`` group only
+    (intra-group HV). When ``hv_config['use_global_pareto_cache']`` is enabled,
+    the manager additionally maintains a bounded-size global Pareto front of
+    objective vectors and computes rewards as::
+
+        ΔHV(i) = HV(P ∪ {v_i}, r) - HV(P, r),
+
+    where ``P`` is the global Pareto cache and ``r`` is a reference point
+    chosen according to ``hv_config['reference_point_strategy']``:
+
+    * ``"dynamic_batch"``: ``r`` is built from the union of the global cache
+      and the current group's vectors (min per-dimension minus an optional
+      margin, then clamped so it is dominated by all group points).
+    * ``"static"``: ``r`` is the user-provided ``hv_config['reference_point']``.
+
+    The cache behaviour is controlled via:
+
+    * ``use_global_pareto_cache`` (bool): enable/disable global mode.
+    * ``pareto_cache_max_size`` (int): maximum number of stored Pareto points.
+    * ``pareto_cache_eps`` (float): dominance tolerance.
+    * ``pareto_cache_strategy`` (str): eviction strategy (currently only
+      ``"fifo"``, keeping the most recent non-dominated points).
     """
 
     def __init__(
@@ -71,6 +93,24 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         # Reward post-processing
         self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "min-max")
+
+        # Global Pareto front cache configuration
+        self.use_global_pareto_cache: bool = bool(
+            hv_config.get("use_global_pareto_cache", False)
+        )
+        self.pareto_cache_max_size: int = int(hv_config.get("pareto_cache_max_size", 1024))
+        self.pareto_cache_eps: float = float(hv_config.get("pareto_cache_eps", 1e-9))
+        self.pareto_cache_strategy: str = hv_config.get("pareto_cache_strategy", "fifo")
+        if self.pareto_cache_strategy not in {"fifo"}:
+            raise ValueError(
+                f"[Amo][HV] Unsupported pareto_cache_strategy: {self.pareto_cache_strategy}"
+            )
+
+        # Internal global Pareto cache state (objective vectors only).
+        # The cache stores a bounded set of non-dominated points under maximization.
+        self._pareto_cache: list[list[float]] = []
+        self._pareto_lock = threading.Lock()
+        self._pareto_dim: int | None = None
 
         # NOTE: For initial version we do *not* normalize objective vectors for HV
         # calculation to avoid changing the geometry of the dominated region.
@@ -159,11 +199,11 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             # Store for HV computation
             individual_scores_list.append([float(s) for s in individual_scores])
             data_sources.append(data_source)
-            
+
             # Get stable uid for grouping
             uid = data_item.non_tensor_batch.get("uid")
             assert uid is not None, "uid should not be None"
-            
+
             uids.append(uid)
             valid_response_lengths.append(valid_response_length)
             prompt_strs.append(prompt_str)
@@ -181,7 +221,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
                 return reward_tensor
 
         # ------------------------------------------------------------------
-        # Group-wise HV computation
+        # Group-wise / global HV computation
         # ------------------------------------------------------------------
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
         dim = score_tensor.shape[1]
@@ -210,26 +250,59 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             [0.0 for _ in range(dim)] for _ in range(len(uids))
         ]
         group_sizes = [0 for _ in range(len(uids))]
+        cache_sizes = [0 for _ in range(len(uids))]
+        used_global_cache_flags = [False for _ in range(len(uids))]
+
+        # Take a snapshot of the global Pareto cache for this batch. The snapshot
+        # is read-only while computing rewards so that all samples in the batch
+        # see a consistent frontier.
+        pareto_cache_snapshot: list[list[float]] = []
+        if self.use_global_pareto_cache and self.pareto_cache_max_size > 0:
+            with self._pareto_lock:
+                pareto_cache_snapshot = [p[:] for p in self._pareto_cache]
+        use_global_cache_for_batch = bool(self.use_global_pareto_cache and self.pareto_cache_max_size > 0)
+        cache_size_for_batch = len(pareto_cache_snapshot) if use_global_cache_for_batch else 0
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
             if group_scores.numel() == 0:
                 continue
 
+            # Prepare Pareto cache tensor for this group (if enabled).
+            if use_global_cache_for_batch and pareto_cache_snapshot:
+                pareto_tensor = torch.tensor(
+                    pareto_cache_snapshot,
+                    dtype=group_scores.dtype,
+                    device=group_scores.device,
+                )
+                if pareto_tensor.shape[1] != group_scores.shape[1]:
+                    raise ValueError(
+                        f"[Amo][HV] Pareto cache dimension mismatch: got {pareto_tensor.shape[1]}, expected {group_scores.shape[1]}."
+                    )
+            else:
+                pareto_tensor = group_scores.new_zeros((0, group_scores.shape[1]))
+
             # Determine reference point for this group
+            group_min = group_scores.min(dim=0).values
             if self.reference_point_strategy == "dynamic_batch":
-                group_min = group_scores.min(dim=0).values
-                ref_point = group_min - self.reference_point_margin
+                if use_global_cache_for_batch and pareto_tensor.numel() > 0:
+                    # Use the union of the global Pareto frontier and the current group's
+                    # objective vectors to determine the reference point, then clamp so
+                    # that it is dominated by all group points.
+                    all_points = torch.cat([group_scores, pareto_tensor], dim=0)
+                    union_min = all_points.min(dim=0).values
+                    ref_point = union_min - self.reference_point_margin
+                else:
+                    ref_point = group_min - self.reference_point_margin
             elif self.reference_point_strategy == "static":
                 assert static_ref_point is not None
-                ref_point = static_ref_point
+                ref_point = static_ref_point.to(dtype=group_scores.dtype, device=group_scores.device)
             else:
                 raise ValueError(
                     f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
                 )
 
             # Ensure reference point is dominated by all objective vectors in this group
-            group_min = group_scores.min(dim=0).values
             ref_point = torch.minimum(ref_point, group_min)
 
             # Optional vector-level normalization for HV.
@@ -238,13 +311,18 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             # ``normalize_vectors_for_hv`` is reserved for future use.
             hv_vectors = group_scores
             if self.normalize_vectors_for_hv:
-                # NOTE: No-op by design in the initial implementation.
+                # NOTE: No-op by design in the current implementation.
                 pass
 
-            # Compute group-wise HV and per-sample HV without each point
-            group_hv, hv_without_each = self._compute_group_hv(hv_vectors, ref_point)
-            contributions = group_hv - hv_without_each  # (group_size,)
-            assert contributions.shape == (len(indices),)
+            # Compute HV contributions: either group-wise or against the global Pareto cache.
+            if use_global_cache_for_batch:
+                group_hv, contributions = self._compute_global_hv_contributions(
+                    hv_vectors, ref_point, pareto_tensor
+                )
+            else:
+                group_hv, hv_without_each = self._compute_group_hv(hv_vectors, ref_point)
+                contributions = group_hv - hv_without_each  # (group_size,)
+                assert contributions.shape == (len(indices),)
 
             # Post-process contributions
             if self.clip_negative:
@@ -258,10 +336,20 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
                 total_hv[global_idx] = group_hv
                 reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
+                cache_sizes[global_idx] = cache_size_for_batch
+                used_global_cache_flags[global_idx] = use_global_cache_for_batch
 
                 valid_response_length = valid_response_lengths[global_idx]
                 if valid_response_length > 0:
                     reward_tensor[global_idx, valid_response_length - 1] = contributions[local_idx]
+
+        # After computing rewards for the whole batch, update the global
+        # Pareto cache once using all objective vectors from this batch. This
+        # ensures that ΔHV is always measured against the cache state prior to
+        # the current batch.
+        if use_global_cache_for_batch:
+            with self._pareto_lock:
+                self._update_pareto_cache(individual_scores_list)
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -291,6 +379,8 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             reward_extra_info["group_uid"].append(uids[i])
             reward_extra_info["dim"].append(dim)
             reward_extra_info["group_size"].append(group_sizes[i])
+            reward_extra_info["cache_size"].append(cache_sizes[i])
+            reward_extra_info["used_global_cache"].append(bool(used_global_cache_flags[i]))
 
         if return_dict:
             return {
@@ -385,7 +475,6 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         if group_size == 0 or dim == 0:
             return vectors.new_tensor(0.0), vectors.new_zeros(group_size)
 
-        # hv_total = self._hv_recursive_slicing(vectors.tolist(), ref_point.tolist())
         hv_total = self._hv_recursive_slicing(vectors, ref_point)
         hv_without_each = []
         for i in range(group_size):
@@ -395,15 +484,59 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
         return hv_total, hv_without_each_tensor
 
+    def _compute_global_hv_contributions(
+        self,
+        group_vectors: torch.Tensor,
+        ref_point: torch.Tensor,
+        pareto_vectors: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute HV(P ∪ {v_i}, r) - HV(P, r) for each ``v_i`` in a group.
+
+        This method is used when the global Pareto cache is enabled. The
+        ``pareto_vectors`` tensor is a snapshot of the global Pareto front for
+        this batch and is *not* modified inside this method.
+
+        Args:
+            group_vectors: Tensor of shape (group_size, dim) with group scores.
+            ref_point: Reference point tensor of shape (dim,).
+            pareto_vectors: Tensor of shape (K, dim) with cached Pareto points.
+
+        Returns:
+            A tuple ``(hv_pareto, contribs)`` where:
+            - hv_pareto: scalar tensor, ``HV(P, ref_point)``.
+            - contribs: tensor of shape (group_size,), where the i-th element is
+              ``HV(P ∪ {v_i}, ref_point) - HV(P, ref_point)``.
+        """
+        group_size, dim = group_vectors.shape
+        if group_size == 0 or dim == 0:
+            return group_vectors.new_tensor(0.0), group_vectors.new_zeros(group_size)
+
+        if pareto_vectors.numel() == 0:
+            hv_pareto = group_vectors.new_tensor(0.0)
+        else:
+            hv_pareto = self._hv_recursive_slicing(pareto_vectors, ref_point)
+
+        contribs = group_vectors.new_zeros(group_size, dtype=torch.float32)
+        for i in range(group_size):
+            vi = group_vectors[i : i + 1]
+            if pareto_vectors.numel() == 0:
+                union_points = vi
+            else:
+                union_points = torch.cat([pareto_vectors, vi], dim=0)
+            hv_with_i = self._hv_recursive_slicing(union_points, ref_point)
+            contribs[i] = (hv_with_i - hv_pareto).to(torch.float32)
+
+        return hv_pareto.to(torch.float32), contribs
+
     def _hv_recursive_slicing(
         self,
         points: torch.Tensor,
         ref_point: torch.Tensor,
-    ) -> float:
+    ) -> torch.Tensor:
         """Compute hypervolume using recursive slicing algorithm."""
         hv: float = self._hv_recursive_slicing_helper(
-            points.tolist(), 
-            ref_point.tolist()
+            points.tolist(),
+            ref_point.tolist(),
         )
         return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device).clamp(min=0.0)
 
@@ -412,8 +545,9 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         points: List[tuple],
         ref_point: tuple,
     ) -> float:
-        """
-        Adapted from Fonseca et al. (2006) recursive slicing algorithm.
+        """Recursive slicing algorithm (list-based implementation).
+
+        Adapted from Fonseca et al. (2006).
         """
         if not points:
             return 0.0
@@ -425,7 +559,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         points = sorted(points, key=lambda p: p[0])
 
         hv = 0.0
-        ref0 = ref_point[0] # moving slice position
+        ref0 = ref_point[0]  # moving slice position
         while points:
             # Current slice: width along dim-0
             p0 = points[0]
@@ -440,3 +574,120 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             points = [p for p in points if p[0] > p0[0]]
 
         return hv
+
+    # ------------------------------------------------------------------
+    # Global Pareto cache helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _dominates(a: list[float], b: list[float], eps: float) -> bool:
+        """Return True if ``a`` Pareto-dominates ``b`` under maximization.
+
+        ``a`` dominates ``b`` if it is no worse in every coordinate and
+        strictly better in at least one, up to tolerance ``eps``.
+        """
+
+        assert len(a) == len(b)
+        better_in_any = False
+        for x, y in zip(a, b):
+            if x + eps < y:  # a is strictly worse in this coordinate
+                return False
+            if x > y + eps:
+                better_in_any = True
+        return better_in_any
+
+    @classmethod
+    def _filter_nondominated(cls, points: list[list[float]], eps: float) -> list[list[float]]:
+        """Quadratic-time non-dominated filtering for arbitrary dimension.
+
+        This is used to maintain an approximate global Pareto front. Complexity
+        is acceptable for the small cache sizes used here (e.g. K <= 1024).
+        """
+
+        n = len(points)
+        if n == 0:
+            return []
+
+        dominated = [False] * n
+        for i in range(n):
+            if dominated[i]:
+                continue
+            pi = points[i]
+            for j in range(n):
+                if i == j or dominated[i]:
+                    continue
+                pj = points[j]
+                if cls._dominates(pj, pi, eps):
+                    dominated[i] = True
+                    break
+
+        result: list[list[float]] = []
+        for i, p in enumerate(points):
+            if not dominated[i]:
+                result.append(p)
+        return result
+
+    def _update_pareto_cache(self, new_points: list[list[float]]) -> None:
+        """Update the global Pareto cache with new objective vectors.
+
+        The cache stores only objective vectors (no metadata) and maintains a
+        bounded set of non-dominated points under maximization. When the cache
+        exceeds ``pareto_cache_max_size``, we evict the oldest points (FIFO)
+        after non-dominated filtering, keeping the most recent points.
+        """
+
+        if not new_points:
+            return
+
+        if self.pareto_cache_max_size <= 0:
+            # Effectively disable the cache while keeping the code paths simple.
+            self._pareto_cache = []
+            self._pareto_dim = None
+            return
+
+        # Determine and validate dimensionality.
+        first_dim = len(new_points[0])
+        for idx, p in enumerate(new_points):
+            if len(p) != first_dim:
+                raise ValueError(
+                    f"[Amo][HV] new_points[{idx}] has dimension {len(p)}, expected {first_dim}."
+                )
+
+        if self._pareto_dim is None:
+            self._pareto_dim = first_dim
+        elif self._pareto_dim != first_dim:
+            raise ValueError(
+                f"[Amo][HV] Pareto cache dimension {self._pareto_dim} does not match new points dimension {first_dim}."
+            )
+
+        # Sanity-check existing cache.
+        for idx, p in enumerate(self._pareto_cache):
+            if len(p) != self._pareto_dim:
+                raise ValueError(
+                    f"[Amo][HV] Cached point at index {idx} has dimension {len(p)}, expected {self._pareto_dim}."
+                )
+
+        eps = float(self.pareto_cache_eps)
+
+        # 1) Filter non-dominated points among the new candidates themselves.
+        new_nd = self._filter_nondominated(list(new_points), eps)
+
+        # 2) Drop existing cache points dominated by any new non-dominated point.
+        remaining_cache: list[list[float]] = []
+        for old in self._pareto_cache:
+            if any(self._dominates(n, old, eps) for n in new_nd):
+                continue
+            remaining_cache.append(old)
+
+        # 3) Drop new points that are dominated by any remaining cache point.
+        filtered_new: list[list[float]] = []
+        for cand in new_nd:
+            if any(self._dominates(old, cand, eps) for old in remaining_cache):
+                continue
+            filtered_new.append(cand)
+
+        # 4) Append new points and enforce FIFO capacity.
+        merged = remaining_cache + filtered_new
+        if len(merged) > self.pareto_cache_max_size:
+            merged = merged[-self.pareto_cache_max_size :]
+
+        self._pareto_cache = merged
