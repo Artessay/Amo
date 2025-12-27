@@ -7,7 +7,7 @@ PROJECT_PREFIX="amo_grpo"
 
 DATASETS=(
     "MATH-500" 
-    "MATH-lighteval"
+    # "MATH-lighteval"
 )
 
 EXPERIMENTS=(

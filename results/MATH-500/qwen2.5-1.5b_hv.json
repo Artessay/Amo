@@ -1,7 +1,7 @@
 {
     "HuggingFaceH4/MATH-500": {
-        "math_accuracy": 0.2,
-        "math_conciseness": 0.991923828125,
-        "math_format": 0.94
+        "math_accuracy": 0.15,
+        "math_conciseness": 0.9969482421875,
+        "math_format": 0.95
     }
 }

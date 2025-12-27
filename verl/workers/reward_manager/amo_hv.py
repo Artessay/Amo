@@ -259,6 +259,7 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             # Compute group-wise HV and per-sample HV without each point
             group_hv, hv_without_each = self._compute_group_hv(hv_vectors, ref_point)
             contributions = group_hv - hv_without_each  # (group_size,)
+            assert contributions.shape == (len(indices),)
 
             # Post-process contributions
             if self.clip_negative:
