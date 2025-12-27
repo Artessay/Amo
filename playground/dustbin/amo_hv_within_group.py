@@ -186,6 +186,18 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
         dim = score_tensor.shape[1]
 
+        # Prepare reference points for dynamic-datasource strategy if needed
+        datasource_ref_points: dict[str, torch.Tensor] = {}
+        if self.reference_point_strategy == "dynamic_datasource":
+            ds2indices: dict[str, list[int]] = defaultdict(list)
+            for idx, ds in enumerate(data_sources):
+                ds2indices[ds].append(idx)
+            for ds, indices in ds2indices.items():
+                vals = score_tensor[indices]
+                min_vals = vals.min(dim=0).values
+                r = min_vals - self.reference_point_margin
+                datasource_ref_points[ds] = r
+
         # Prepare static reference point if configured
         static_ref_point: torch.Tensor | None = None
         if self.reference_point_strategy == "static":
@@ -223,6 +235,9 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
             elif self.reference_point_strategy == "static":
                 assert static_ref_point is not None
                 ref_point = static_ref_point
+            elif self.reference_point_strategy == "dynamic_datasource":
+                ds = data_sources[indices[0]]
+                ref_point = datasource_ref_points[ds]
             else:
                 raise ValueError(
                     f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
