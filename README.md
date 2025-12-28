@@ -34,6 +34,12 @@ Login to `wandb`
 wandb login
 ```
 
+Login to `swanlab`
+
+```bash
+swanlab login
+```
+
 
 ## Download LLMs from ModelScope
 
