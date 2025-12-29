@@ -6,9 +6,9 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_PREFIX="amo_grpo"
 
 DATASETS=(
-    "MATH-500" 
+    # "MATH-500"
     # "MATH-lighteval"
-    # "PKU-SafeRLHF"
+    "PKU-SafeRLHF"
 )
 
 EXPERIMENTS=(

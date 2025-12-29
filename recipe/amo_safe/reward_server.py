@@ -99,7 +99,7 @@ class RewardServiceServicer(reward_pb2_grpc.RewardServiceServicer):
             alpha, beta = self._calibration
             calibrated_tensor = calibrate_score(score_tensor.view(-1), alpha=alpha, beta=beta)
             calibrated_score = float(calibrated_tensor[0].item())
-            logger.debug(
+            logger.info(
                 "\nPrompt: %s\nResponse: %s\nRaw score: %.4f\nCalibrated score: %.4f",
                 prompt,
                 response,
@@ -108,7 +108,7 @@ class RewardServiceServicer(reward_pb2_grpc.RewardServiceServicer):
             )
             return calibrated_score
 
-        logger.debug("\nPrompt: %s\nResponse: %s\nScore: %.6f", prompt, response, raw_score)
+        logger.info("\nPrompt: %s\nResponse: %s\nScore: %.6f", prompt, response, raw_score)
         return raw_score
 
 
