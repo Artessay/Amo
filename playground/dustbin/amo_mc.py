@@ -407,29 +407,26 @@ class AmoMCRewardManager(AmoVanillaRewardManager):
             sub = self._remove_index(vectors, i)
             hv_without_each.append(self._hv_recursive_slicing(sub, ref_point))
 
-        hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
-        return hv_total, hv_without_each_tensor
+        if dim == 1:
+            hv_total = self._hv_1d(vectors, ref_point)
+            hv_without_each = []
+            for i in range(group_size):
+                sub = self._remove_index(vectors, i)
+                hv_without_each.append(self._hv_1d(sub, ref_point))
+            hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
+            return hv_total, hv_without_each_tensor
 
-        # if dim == 1:
-        #     hv_total = self._hv_1d(vectors, ref_point)
-        #     hv_without_each = []
-        #     for i in range(group_size):
-        #         sub = self._remove_index(vectors, i)
-        #         hv_without_each.append(self._hv_1d(sub, ref_point))
-        #     hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
-        #     return hv_total, hv_without_each_tensor
+        if dim == 2:
+            hv_total = self._hv_2d_exact(vectors, ref_point)
+            hv_without_each = []
+            for i in range(group_size):
+                sub = self._remove_index(vectors, i)
+                hv_without_each.append(self._hv_2d_exact(sub, ref_point))
+            hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
+            return hv_total, hv_without_each_tensor
 
-        # if dim == 2:
-        #     hv_total = self._hv_2d_exact(vectors, ref_point)
-        #     hv_without_each = []
-        #     for i in range(group_size):
-        #         sub = self._remove_index(vectors, i)
-        #         hv_without_each.append(self._hv_2d_exact(sub, ref_point))
-        #     hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
-        #     return hv_total, hv_without_each_tensor
-
-        # # dim > 2: Monte Carlo approximation
-        # return self._hv_mc_contributions(vectors, ref_point, self.mc_sample_count)
+        # dim > 2: Monte Carlo approximation
+        return self._hv_mc_contributions(vectors, ref_point, self.mc_sample_count)
 
     @staticmethod
     def _hv_1d(points: torch.Tensor, ref_point: torch.Tensor) -> torch.Tensor:
@@ -560,49 +557,3 @@ class AmoMCRewardManager(AmoVanillaRewardManager):
         hv_without_each = hv_without_each_counts.to(points.dtype) / num_samples * volume
 
         return hv_total, hv_without_each
-
-
-    def _hv_recursive_slicing_helper(
-        self,
-        points: List[tuple],
-        ref_point: tuple,
-    ) -> float:
-        """
-        Adapted from Fonseca et al. (2006) recursive slicing algorithm.
-        """
-        if not points:
-            return 0.0
-
-        # 1-D case
-        if len(ref_point) == 1:
-            return max(p[0] for p in points) - ref_point[0]
-
-        points = sorted(points, key=lambda p: p[0])
-
-        hv = 0.0
-        ref0 = ref_point[0] # moving slice position
-        while points:
-            # Current slice: width along dim-0
-            p0 = points[0]
-            width = p0[0] - ref0
-            if width > 0:
-                # All points in this slice, projected to the remaining m-1 dims
-                slice_pts = [p[1:] for p in points]
-                slice_ref = ref_point[1:]
-                hv += width * self._hv_recursive_slicing_helper(slice_pts, slice_ref)
-                ref0 = p0[0]
-            # Keep only points strictly beyond the present slice
-            points = [p for p in points if p[0] > p0[0]]
-
-        return hv
-
-    def _hv_recursive_slicing(
-        self,
-        points: torch.Tensor,
-        ref_point: torch.Tensor,
-    ) -> float:
-        hv = self._hv_recursive_slicing_helper(
-            points.tolist(), 
-            ref_point.tolist()
-        )
-        return torch.clamp(hv, min=0.0)
