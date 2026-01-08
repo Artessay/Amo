@@ -16,9 +16,10 @@ from prompts import (
 )
 
 # Assuming the model is hosted with OpenAI compatible api
-client = OpenAI(api_key="EMPTY", base_url="http://localhost:8000/v1")
+API_PORT = os.environ.get("API_PORT", "8000")
+client = OpenAI(api_key="EMPTY", base_url=f"http://localhost:{API_PORT}/v1")
 
-MODEL_ID = ""
+MODEL_ID = "Qwen2.5-72B-Instruct"
 
 
 def generate_response(
@@ -26,7 +27,7 @@ def generate_response(
     system_prompt: str = SYSTEM_PROMPT,
     model_name: str = MODEL_ID,
     temperature: float = 0.1,  # Low temperature for judging
-    max_output_tokens: int = 4_000,
+    max_output_tokens: int = 4096,
 ) -> list[dict]:
     # generate response
     message_list = [{"role": "system", "content": system_prompt}] + prompt

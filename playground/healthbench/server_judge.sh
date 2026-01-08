@@ -2,7 +2,9 @@
 set -Eeuo pipefail
 
 # Launch an OpenAI-compatible vLLM server (defaults: API_PORT=8000)
-# Required envs: MODEL_PATH, MODEL_ID
+# Required envs: MODEL_PATH, 
+MODEL_ID=Qwen2.5-72B-Instruct
+MODEL_PATH=/data/Qwen/Qwen2.5-72B-Instruct
 
 load_env_file() {
   local env_file="${1:-.env}"

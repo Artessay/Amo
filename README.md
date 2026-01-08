@@ -52,6 +52,7 @@ modelscope download --model Qwen/Qwen2.5-0.5B-Instruct  --local_dir /data/Qwen/Q
 modelscope download --model Qwen/Qwen2.5-1.5B-Instruct  --local_dir /data/Qwen/Qwen2.5-1.5B-Instruct
 modelscope download --model Qwen/Qwen2.5-3B-Instruct  --local_dir /data/Qwen/Qwen2.5-3B-Instruct
 modelscope download --model Qwen/Qwen2.5-7B-Instruct  --local_dir /data/Qwen/Qwen2.5-7B-Instruct
+modelscope download --model Qwen/Qwen2.5-72B-Instruct  --local_dir /data/Qwen/Qwen2.5-72B-Instruct
 
 modelscope download --model Qwen/Qwen3-0.6B  --local_dir /data/Qwen/Qwen3-0.6B
 modelscope download --model Qwen/Qwen3-1.7B  --local_dir /data/Qwen/Qwen3-1.7B
