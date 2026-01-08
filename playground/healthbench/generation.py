@@ -14,19 +14,25 @@ from prompts import SYSTEM_PROMPT
 
 load_dotenv()
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_API_BASE_URL = os.environ.get("OPENAI_API_BASE_URL", f"http://localhost:8000/v1")
 
+print(f"Using OpenAI API Key: {OPENAI_API_KEY}")
+print(f"Using OpenAI API Base URL: {OPENAI_API_BASE_URL}")
 
 # Assuming the model is hosted with OpenAI compatible api
-client = OpenAI(api_key="EMPTY", base_url="http://localhost:8000/v1")
+client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_BASE_URL)
 
-MODEL_ID = ""
+MODEL_ID = os.environ.get("MODEL_ID", "")
 
 
-def is_server_running(port=8000):
-    url = f"http://localhost:{port}/v1/models"
+def is_server_running() -> bool:
+    url = f"{OPENAI_API_BASE_URL}/models"
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers=headers)
         if response.status_code == 200:
             print("Server is running.")
             return True
@@ -39,7 +45,7 @@ def generate_response(
     prompt: list,
     system_prompt: str = SYSTEM_PROMPT,
     temperature: float = 0.05,  # Low temperature for generation
-    max_output_tokens: int = 4_000,
+    max_output_tokens: int = 4096,
 ) -> list[dict]:
     global MODEL_ID
     model_name = MODEL_ID
@@ -82,21 +88,16 @@ def run(
     if model_id is not None:
         MODEL_ID = model_id  # In case a different model name is passed
 
-    # Make sure local deployments dont contain gpt in their name
-    if "gpt" in MODEL_ID:
-        global client
-        client = OpenAI(api_key=OPENAI_API_KEY)
+    # Wait for the server to be ready
+    for _ in tqdm(
+        range(300), desc="Waiting for the server to start!"
+    ):  # Retry for up to ~300 seconds
+        if is_server_running():
+            break
+        time.sleep(5)
     else:
-        # Wait for the server to be ready
-        for _ in tqdm(
-            range(300), desc="Waiting for the server to start!"
-        ):  # Retry for up to ~300 seconds
-            if is_server_running(port=8000):
-                break
-            time.sleep(5)
-        else:
-            print("Server did not start in time.")
-            exit(1)
+        print("Server did not start in time.")
+        exit(1)
 
     INPUT_FILE_PATH = "data/benchmark/health_bench.jsonl"
 

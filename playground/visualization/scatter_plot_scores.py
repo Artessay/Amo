@@ -1,147 +1,141 @@
 import json
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
 from pathlib import Path
 import argparse
-import numpy as np
 
-def read_jsonl_scores(jsonl_path):
+def read_jsonl_to_df(scores_dir):
     """
-    Read helpful_score and harmless_score from JSONL file.
-    
-    Args:
-        jsonl_path: Path to the input JSONL file
-    
-    Returns:
-        tuple: (helpful_scores, harmless_scores)
-    """
-    helpful_scores = []
-    harmless_scores = []
-    
-    with open(jsonl_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            data = json.loads(line.strip())
-            helpful_scores.append(data.get('helpful_score', 0))
-            harmless_scores.append(data.get('harmless_score', 0))
-    
-    return helpful_scores, harmless_scores
-
-def plot_multi_experiment_scatter(scores_dir):
-    """
-    Plot scatter plot of helpful_score vs harmless_score from all JSONL files in directory.
-    
-    Args:
-        scores_dir: Path to the directory containing JSONL files
+    读取目录下所有 JSONL 并转换为 Pandas DataFrame，方便 Seaborn 使用
     """
     scores_path = Path(scores_dir)
-    
-    # Get all JSONL files in the directory
     jsonl_files = sorted(scores_path.glob("*.jsonl"))
     
     if not jsonl_files:
         print(f"No JSONL files found in {scores_dir}")
-        return
-    
-    # Color palette for different experiments
-    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 
-              'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
-    
-    # Read all data
-    all_data = []
-    all_helpful = []
-    all_harmless = []
-    
+        return pd.DataFrame()
+
+    all_records = []
+
     for jsonl_file in jsonl_files:
-        helpful_scores, harmless_scores = read_jsonl_scores(jsonl_file)
         experiment_name = jsonl_file.stem
-        all_data.append({
-            'name': experiment_name,
-            'helpful': helpful_scores,
-            'harmless': harmless_scores
-        })
-        all_helpful.extend(helpful_scores)
-        all_harmless.extend(harmless_scores)
+        with open(jsonl_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line.strip())
+                    all_records.append({
+                        "experiment": experiment_name,
+                        "helpful": data.get('helpful_score', 0),
+                        "harmless": data.get('harmless_score', 0)
+                    })
+                except json.JSONDecodeError:
+                    continue
     
-    # Plot style
-    try:
-        plt.style.use("seaborn-whitegrid")
-    except Exception:
-        pass
+    return pd.DataFrame(all_records)
+
+def plot_enhanced_scatter(df, output_dir):
+    """
+    使用 Seaborn 绘制优化后的散点图
+    """
+    # 设置 Seaborn 主题
+    sns.set_theme(style="whitegrid", context="talk", font_scale=1.0)
     
-    plt.rcParams.update({
-        "font.size": 16,
-        "axes.labelsize": 18,
-        "axes.titlesize": 20,
-        "legend.fontsize": 14,
-        "xtick.labelsize": 14,
-        "ytick.labelsize": 14,
-        "lines.linewidth": 2.0
-    })
-    
+    # 创建画布
     fig, ax = plt.subplots(figsize=(12, 8))
     
-    # Plot scatter points for each experiment
-    for idx, data in enumerate(all_data):
-        color = colors[idx % len(colors)]
-        ax.scatter(data['helpful'], data['harmless'], 
-                   alpha=0.6, s=50, color=color, 
-                   edgecolors='tab:gray', linewidth=0.5,
-                   label=data['name'])
-    
-    # Customize axes
-    # ax.set_title('Score Distribution: Helpful vs Harmless\n(Multiple Experiments)')
+    # --- 关键修改 1: 添加抖动 (Jitter) ---
+    # 如果分数是离散的（如整数），直接画会重叠。
+    # 这里我们手动创建抖动数据用于绘图，但保留原始数据用于统计
+    # 抖动幅度设为 0.15 (根据你的数据范围调整，如果分数范围是0-100，可以设大一点)
+    # jitter_strength = 0.15 
+    # df['helpful_jitter'] = df['helpful'] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+    # df['harmless_jitter'] = df['harmless'] + np.random.uniform(-jitter_strength, jitter_strength, len(df))
+
+    # --- 关键修改 2: 使用 Seaborn Scatterplot ---
+    # alpha: 透明度，越低越能看清重叠
+    # s: 点的大小
+    # hue: 根据实验名称自动上色
+    sns.scatterplot(
+        data=df,
+        x='helpful', 
+        y='harmless',
+        # x='helpful_jitter', 
+        # y='harmless_jitter',
+        hue='experiment',
+        style='experiment', # 不同实验使用不同形状的点，辅助区分
+        alpha=0.4,          # 透明度，解决遮挡的关键
+        s=20,               # 点大小
+        # edgecolor='w',      # 给点加白边，区分度更高
+        linewidth=0.5,
+        ax=ax
+    )
+
+    # --- 可选方案：如果你想看密度而不是点，解开下面这行注释使用 KDE ---
+    # sns.kdeplot(data=df, x='helpful', y='harmless', hue='experiment', levels=5, alpha=0.7, ax=ax)
+
+    # 设置标题和标签
+    # ax.set_title('Score Distribution: Helpful vs Harmless', pad=20)
     ax.set_xlabel('Helpful Score')
     ax.set_ylabel('Harmless Score')
-    
-    # Set axis limits based on all data
-    min_helpful = min(all_helpful)
-    max_helpful = max(all_helpful)
-    min_harmless = min(all_harmless)
-    max_harmless = max(all_harmless)
-    
-    ax.set_xlim(min_helpful - 0.2, max_helpful + 0.2)
-    ax.set_ylim(min_harmless - 0.2, max_harmless + 0.2)
-    
-    # Grid
-    ax.grid(True, which="major", linestyle="-", linewidth=0.6, alpha=0.5)
-    ax.grid(True, which="minor", linestyle="--", linewidth=0.4, alpha=0.3)
-    ax.minorticks_on()
-    
-    # Legend
-    legend = ax.legend(loc="best", frameon=False, ncol=1)
-    
-    # # Add statistics for each experiment
-    # stats_text = ""
-    # for idx, data in enumerate(all_data):
-    #     mean_helpful = sum(data['helpful']) / len(data['helpful'])
-    #     mean_harmless = sum(data['harmless']) / len(data['harmless'])
-    #     stats_text += f"{data['name']}:\n"
-    #     stats_text += f"  Mean H: {mean_helpful:.2f}, Mean M: {mean_harmless:.2f}\n"
-    #     stats_text += f"  Samples: {len(data['helpful'])}\n"
-    
-    # # Place statistics text outside the plot area
-    # ax.text(1.02, 1.0, stats_text, transform=ax.transAxes, 
-    #         verticalalignment='top', horizontalalignment='left',
-    #         bbox=dict(boxstyle='round', alpha=0.1), fontsize=9)
-    
-    # Adjust layout to make room for statistics
+
+    # 移动图例到图外，防止遮挡数据
+    # sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+
+    # 自动调整坐标轴范围 (加一点余量)
+    ax.set_xlim(df['helpful'].min() - 0.5, df['helpful'].max() + 0.5)
+    ax.set_ylim(df['harmless'].min() - 0.5, df['harmless'].max() + 0.5)
+
     plt.tight_layout()
-    # plt.subplots_adjust(right=0.75)
     
-    # Save plots
-    output_dir = scores_path.parent
-    plt.savefig(output_dir / "all_experiments_scatter.pdf")
-    plt.savefig(output_dir / "all_experiments_scatter.png", dpi=300)
-    print(f"Plots saved as all_experiments_scatter.pdf and all_experiments_scatter.png")
-    print(f"Total experiments: {len(all_data)}")
+    # 保存
+    output_path = Path(output_dir)
+    plt.savefig(output_path / "all_experiments_seaborn.pdf", bbox_inches='tight')
+    plt.savefig(output_path / "all_experiments_seaborn.png", dpi=300, bbox_inches='tight')
+    print(f"Plots saved to {output_dir}")
+
+def plot_facetted_view(df, output_dir):
+    """
+    方案二：分面图（每个实验一张小图，彻底解决遮挡）
+    """
+    g = sns.relplot(
+        data=df,
+        x='helpful', 
+        y='harmless',
+        col='experiment',      # 按实验分列
+        col_wrap=3,            # 每行显示3个图
+        hue='experiment',
+        kind='scatter',
+        alpha=0.6,
+        s=50,
+        height=4, 
+        aspect=1
+    )
+    
+    # 同样加上微小的抖动效果（Seaborn relplot 不支持直接 jitter 参数，通常需要在数据预处理做，或者接受重叠）
+    # 这里演示的是原始数据视图
+    
+    output_path = Path(output_dir)
+    plt.savefig(output_path / "all_experiments_facet.png", dpi=300, bbox_inches='tight')
+    print("Facet plots saved.")
 
 if __name__ == "__main__":
-    # Create argument parser
-    parser = argparse.ArgumentParser(description="Plot scatter plot of helpful vs harmless scores for all experiments")
-    parser.add_argument("-d", "--dir", type=str, default="playground/visualization/scores", 
-                        help="Path to the directory containing JSONL files (default: playground/visualization/scores)")
-    
-    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--dir", type=str, default="playground/visualization/scores")
     args = parser.parse_args()
-    scores_dir = args.dir
     
-    plot_multi_experiment_scatter(scores_dir)
+    # 1. 读取数据为 DataFrame
+    df = read_jsonl_to_df(args.dir)
+    
+    if not df.empty:
+        print(f"Total samples: {len(df)}")
+        print(f"Experiments found: {df['experiment'].unique()}")
+        
+        # 2. 绘制优化后的散点图 (带抖动)
+        plot_enhanced_scatter(df, Path(args.dir).parent)
+        
+        # 3. (可选) 绘制分面图
+        # plot_facetted_view(df, Path(args.dir).parent)
+    else:
+        print("No data found.")

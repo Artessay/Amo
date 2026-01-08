@@ -1,0 +1,29 @@
+model_list:
+  - model_name: qwen2.5-1.5b   
+    litellm_params:
+      model: openai/qwen2.5-1.5b-instruct
+      api_base: "http://0.0.0.0:6181/v1" 
+      api_key: ""
+  
+  - model_name: qwen2.5-1.5b
+    litellm_params:
+      model: openai/qwen2.5-1.5b-instruct
+      api_base: "http://0.0.0.0:6182/v1" 
+      api_key: ""
+
+  - model_name: qwen2.5-1.5b
+    litellm_params:
+      model: openai/qwen2.5-1.5b-instruct
+      api_base: "http://0.0.0.0:6183/v1"
+      api_key: ""
+
+  - model_name: qwen2.5-1.5b
+    litellm_params:
+      model: openai/qwen2.5-1.5b-instruct
+      api_base: "http://0.0.0.0:6184/v1" 
+      api_key: ""
+
+# LiteLLM 
+general_settings:
+  master_key: sk-1234 # change this to your own key
+  
