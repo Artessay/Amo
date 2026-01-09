@@ -38,6 +38,7 @@ main() {
   exec python -m vllm.entrypoints.openai.api_server \
     --model "$MODEL_PATH" \
     --port "$API_PORT" \
+    --dtype bfloat16 \
     --tensor-parallel-size 4 \
     --gpu-memory-utilization 0.95 \
     --trust-remote-code \

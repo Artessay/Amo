@@ -266,7 +266,7 @@ def process_and_save(subset_name: str, subset_ds: dict, output_dir: str):
     with open(
         os.path.join(output_dir, f"final_metrics_{subset_name.lower()}.json"), "w"
     ) as f:
-        json.dump(final_metrics, f, indent=2)
+        json.dump(final_metrics, f, indent=4)
 
 
 def run(
