@@ -16,10 +16,8 @@ from prompts import (
 )
 
 # Assuming the model is hosted with OpenAI compatible api
-API_PORT = os.environ.get("API_PORT", "8000")
-client = OpenAI(api_key="EMPTY", base_url=f"http://localhost:{API_PORT}/v1")
-
-MODEL_ID = "Qwen2.5-72B-Instruct"
+API_PORT = os.environ.get("API_PORT", "8165")
+MODEL_ID = "Qwen2.5-32B-Instruct"
 
 
 def generate_response(
@@ -29,16 +27,24 @@ def generate_response(
     temperature: float = 0.1,  # Low temperature for judging
     max_output_tokens: int = 4096,
 ) -> list[dict]:
+    # initialize client
+    client = OpenAI(api_key="EMPTY", base_url=f"http://localhost:{API_PORT}/v1")
+
     # generate response
     message_list = [{"role": "system", "content": system_prompt}] + prompt
-    response = client.chat.completions.create(
-        model=model_name,
-        temperature=temperature,
-        max_tokens=max_output_tokens,
-        messages=message_list,
-    )
 
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            temperature=temperature,
+            max_tokens=max_output_tokens,
+            messages=message_list,
+        )
+
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating response: {e}")
+        return "{}"
 
 
 def parse_json_to_dict(json_string: str) -> dict:
@@ -270,8 +276,12 @@ def process_and_save(subset_name: str, subset_ds: dict, output_dir: str):
 
 
 def run(
-    input_data_path: str = None,
+    model_id: str = None,
 ):
+    if model_id is None:
+        raise ValueError("model_id must be provided")
+
+    input_data_path: str = f"data/generations/{model_id}.jsonl"
 
     # Extract base name without extension
     base_name = os.path.splitext(os.path.basename(input_data_path))[0]
@@ -284,7 +294,8 @@ def run(
 
     ds = load_dataset(input_filepath=input_data_path)
 
-    metrics_ds = ds.map(lambda x: grade_sample(x), num_proc=mp.cpu_count())
+    # metrics_ds = ds.map(grade_sample)
+    metrics_ds = ds.map(grade_sample, num_proc=mp.cpu_count())
 
     # ALL
     process_and_save("ALL", metrics_ds, output_dir=output_dir)

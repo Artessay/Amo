@@ -3,8 +3,8 @@ set -Eeuo pipefail
 
 # Launch an OpenAI-compatible vLLM server (defaults: API_PORT=8000)
 # Required envs: MODEL_PATH, 
-MODEL_ID=Qwen2.5-72B-Instruct
-MODEL_PATH=/data/Qwen/Qwen2.5-72B-Instruct
+MODEL_ID=Qwen2.5-32B-Instruct
+MODEL_PATH=/data/Qwen/Qwen2.5-32B-Instruct
 
 load_env_file() {
   local env_file="${1:-.env}"
@@ -27,20 +27,23 @@ require_env() {
 }
 
 main() {
-  load_env_file ".env"
+  # load_env_file ".env"
 
-  : "${API_PORT:=8000}"
+  : "${API_PORT:=8165}"
   echo "Starting vLLM OpenAI API server on port ${API_PORT}..."
 
   require_env "MODEL_PATH"
   require_env "MODEL_ID"
+
+  echo "Using MODEL_ID ${MODEL_ID}"
 
   exec python -m vllm.entrypoints.openai.api_server \
     --model "$MODEL_PATH" \
     --port "$API_PORT" \
     --dtype bfloat16 \
     --tensor-parallel-size 4 \
-    --gpu-memory-utilization 0.95 \
+    --gpu-memory-utilization 0.85 \
+    --max-model-len 16384 \
     --trust-remote-code \
     --enable-prefix-caching \
     --served-model-name "$MODEL_ID"
