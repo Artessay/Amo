@@ -3,7 +3,6 @@ import json
 import os
 from typing import List, Optional
 
-import torch
 from tqdm import tqdm
 
 from align_anything.models.pretrained_model import load_pretrained_models
