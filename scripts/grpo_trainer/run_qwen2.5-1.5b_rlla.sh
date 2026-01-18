@@ -16,10 +16,10 @@ AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
 
-EPOCH=15
+EPOCH=50
 
 NUM_NODES=1
-NUM_GPUS_PER_NODE=2
+NUM_GPUS_PER_NODE=4
 MICRO_BATCH_SIZE_PER_GPU=32
 TENSOR_MODEL_PARALLEL_SIZE=1
 
@@ -37,7 +37,7 @@ python3 -m verl.trainer.main_ppo \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
-    actor_rollout_ref.actor.optim.lr=1e-6 \
+    actor_rollout_ref.actor.optim.lr=1e-5 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \
@@ -68,5 +68,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
     trainer.save_freq=10 \
-    trainer.test_freq=10 \
+    trainer.test_freq=5 \
     trainer.total_epochs=$EPOCH $@
