@@ -8,17 +8,18 @@ PROJECT_PREFIX="amo_grpo"
 DATASETS=(
     # "MATH-500"
     # "MATH-lighteval"
-    "PKU-SafeRLHF"
+    # "PKU-SafeRLHF"
+    "rlla_4k"
     # "cnn_dailymail"
 )
 
-# MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
-    # "qwen2.5-1.5b_vanilla"
-    "qwen2.5-1.5b_hv"
+    "qwen2.5-1.5b_vanilla"
+    # "qwen2.5-1.5b_hv"
 
     # "qwen2.5-3b"
     
