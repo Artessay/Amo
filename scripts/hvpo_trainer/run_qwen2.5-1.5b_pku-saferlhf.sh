@@ -1,15 +1,5 @@
 set -x
 
-# Validate reward variables length consistency
-SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
-VALIDATE_SCRIPT="$SCRIPT_DIR/validate_reward_variables.py"
-if [ -f "$VALIDATE_SCRIPT" ]; then
-    python "$VALIDATE_SCRIPT" --check "${BASH_SOURCE[0]}"
-    if [ $? -ne 0 ]; then
-        echo "Validation failed! Exiting..."
-        exit 1
-    fi
-fi
 
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
@@ -30,6 +20,7 @@ EPOCH=1
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
 MICRO_BATCH_SIZE_PER_GPU=16
+TENSOR_MODEL_PARALLEL_SIZE=1
 
 HV_REFERENCE_POINT_STRATEGY="dynamic_batch" # "static" # "dynamic_batch"
 # HV_REFERENCE_POINT="[-0.0, -0.0]"
@@ -67,7 +58,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=$TENSOR_MODEL_PARALLEL_SIZE \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.mode=sync \
@@ -78,7 +69,7 @@ python3 -m verl.trainer.main_ppo \
     reward_model.reward_manager=$REWARD_MANAGER \
     custom_reward_function.path=$REWARD_FUNCTION_PATH \
     trainer.critic_warmup=0 \
-    trainer.logger='["console", "wandb"]' \
+    trainer.logger='["console", "swanlab"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \

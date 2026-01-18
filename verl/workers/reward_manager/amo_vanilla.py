@@ -72,7 +72,8 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         already_print_data_sources = {}
 
         # [Amo] vanilla solution: weighted sum of all reward functions
-        weights: list = data.meta_info["amo_weights"]
+        num_objects = len(self.compute_score.keys())
+        weights = torch.ones(num_objects, dtype=torch.float32) / num_objects
 
         for i in range(len(data)):
             data_item = data[i]  # DataProtoItem

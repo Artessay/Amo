@@ -3,12 +3,13 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_PREFIX="amo_grpo"
+PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
     # "MATH-lighteval"
-    "PKU-SafeRLHF"
+    # "PKU-SafeRLHF"
+    "rlla"
     # "cnn_dailymail"
 )
 
@@ -16,9 +17,8 @@ DATASETS=(
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
-    # "qwen2.5-1.5b_grpo"
-    # "qwen2.5-1.5b_vanilla"
-    "qwen2.5-1.5b_hv"
+    "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b_hv"
 
     # "qwen2.5-3b"
     

@@ -1,37 +1,27 @@
 set -x
 
-# Validate reward variables length consistency
-SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
-VALIDATE_SCRIPT="$SCRIPT_DIR/validate_reward_variables.py"
-if [ -f "$VALIDATE_SCRIPT" ]; then
-    python "$VALIDATE_SCRIPT" --check "${BASH_SOURCE[0]}"
-    if [ $? -ne 0 ]; then
-        echo "Validation failed! Exiting..."
-        exit 1
-    fi
-fi
 
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_pku-saferlhf"
+PROJECT_NAME="amo_grpo_math-lighteval"
 EXPERIMENT_NAME="qwen2.5-1.5b_vanilla"
 
-TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
-VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/MATH-lighteval/train.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_vanilla"
-REWARD_WEIGHTS="[0.5,0.5]"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
-EPOCH=1
+EPOCH=50
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
 MICRO_BATCH_SIZE_PER_GPU=16
+TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
@@ -41,8 +31,8 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=128 \
-    data.max_prompt_length=512 \
-    data.max_response_length=512 \
+    data.max_prompt_length=2048 \
+    data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
@@ -61,7 +51,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=$TENSOR_MODEL_PARALLEL_SIZE \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.mode=async \
@@ -71,9 +61,8 @@ python3 -m verl.trainer.main_ppo \
     algorithm.use_kl_in_reward=False \
     reward_model.reward_manager=$REWARD_MANAGER \
     custom_reward_function.path=$REWARD_FUNCTION_PATH \
-    +custom_reward_function.amo_weights=$REWARD_WEIGHTS \
     trainer.critic_warmup=0 \
-    trainer.logger='["console","wandb"]' \
+    trainer.logger='["console", "swanlab"]' \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \

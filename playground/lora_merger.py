@@ -7,7 +7,7 @@ def merge_peft_model(model_path: str, adapter_path: str, save_path: str):
     """
     # Load the base model
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    base_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype="auto")
+    base_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", dtype="auto")
 
     # Load the PEFT model
     adapter_model = PeftModel.from_pretrained(base_model, adapter_path)
