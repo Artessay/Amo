@@ -7,8 +7,8 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_NAME="amo_rlla"
 EXPERIMENT_NAME="qwen2.5-1.5b_grpo"
 
-TRAIN_FILES="$WORKSPACE/data/rlla_4k/train.parquet"
-VAL_FILES="$WORKSPACE/data/rlla_4k/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/rlla/train.parquet"
+VAL_FILES="$WORKSPACE/data/rlla/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
@@ -20,7 +20,7 @@ EPOCH=15
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=128
+MICRO_BATCH_SIZE_PER_GPU=32
 TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
@@ -41,7 +41,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
