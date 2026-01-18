@@ -68,6 +68,11 @@ class AmoVanillaRewardManager(AbstractRewardManager):
         
         reward_tensor = torch.zeros_like(data.batch["responses"], dtype=torch.float32)
         reward_extra_info = defaultdict(list)
+        
+        # [Amo] Initialize token_level_scores for each reward function
+        token_level_scores_dict = {}
+        for reward_fn_name in self.compute_score.keys():
+            token_level_scores_dict[reward_fn_name] = torch.zeros_like(data.batch["responses"], dtype=torch.float32)
 
         already_print_data_sources = {}
 
@@ -120,7 +125,12 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             # [Amo] compute weighted sum
             reward = sum(w * s for w, s in zip(weights, individual_scores))
 
+            # [Amo] Store the total reward and individual rewards to the corresponding tensors
             reward_tensor[i, valid_response_length - 1] = reward
+            
+            # [Amo] Store individual rewards to their respective token_level_scores tensors
+            for idx, (reward_fn_name, score) in enumerate(zip(self.compute_score.keys(), individual_scores)):
+                token_level_scores_dict[reward_fn_name][i, valid_response_length - 1] = score
 
             if data_source not in already_print_data_sources:
                 already_print_data_sources[data_source] = 0
@@ -136,10 +146,15 @@ class AmoVanillaRewardManager(AbstractRewardManager):
                     print(f"[{reward_fn_name} score]", score)
                 print("[reward]", reward)
 
+        # [Amo] Add token_level_scores_dict to reward_extra_info
+        for reward_fn_name, token_level_scores in token_level_scores_dict.items():
+            reward_extra_info[f"token_level_scores_{reward_fn_name}"] = token_level_scores
+
         if return_dict:
             return {
                 "reward_tensor": reward_tensor,
                 "reward_extra_info": reward_extra_info,
+                "token_level_scores_dict": token_level_scores_dict,
             }
         else:
             return reward_tensor

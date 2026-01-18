@@ -57,7 +57,7 @@ from verl.utils.debug import marked_timer
 from verl.utils.metric import reduce_metrics
 from verl.utils.rollout_skip import RolloutSkip
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions, log_seqlen_unbalance
-from verl.utils.torch_functional import masked_mean
+from verl.utils.torch_functional import masked_mean, masked_whiten
 from verl.utils.tracking import ValidationGenerationsLogger
 
 
@@ -239,6 +239,38 @@ def compute_advantage(
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
+    elif adv_estimator == AdvantageEstimator.GDPO:
+        # Initialize the mask for GRPO calculation
+        response_mask = data.batch["response_mask"]
+
+        # Get all reward keys that start with "token_level_scores_"
+        reward_keys = [key for key in data.batch.keys() if key.startswith("token_level_scores_")]
+        
+        # Calculate advantage for each reward function
+        advantage_score_list = []
+        for reward_key in reward_keys:
+            # Get the token-level scores for this reward type
+            token_level_scores = data.batch[reward_key]
+            
+            # Call compute_grpo_outcome_advantage for this reward type
+            normalized_score, _ = core_algos.compute_grpo_outcome_advantage(
+                token_level_rewards=token_level_scores,
+                response_mask=response_mask,
+                index=data.non_tensor_batch["uid"],
+                norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+            )
+            
+            advantage_score_list.append(normalized_score)
+        
+        # Sum all normalized scores to get the final advantage score
+        advantage_score = sum(advantage_score_list)
+        
+        # Apply masked_whiten to normalize the advantage score
+        advantages = masked_whiten(advantage_score, response_mask) * response_mask
+        
+        # In GDPO, returns are the same as advantages
+        data.batch["advantages"] = advantages
+        data.batch["returns"] = advantages
     else:
         # handle all other adv estimator type other than GAE and GRPO
         adv_estimator_fn = core_algos.get_adv_estimator_fn(adv_estimator)
@@ -1185,11 +1217,41 @@ class RayPPOTrainer:
                         # we combine with rule-based rm
                         reward_extra_infos_dict: dict[str, list]
                         if self.config.reward_model.launch_reward_fn_async:
-                            reward_tensor, reward_extra_infos_dict = ray.get(future_reward)
+                            reward_result = ray.get(future_reward)
+                            # Handle both cases: with and without token_level_scores_dict
+                            if isinstance(reward_result, tuple) and len(reward_result) == 2:
+                                reward_tensor, reward_extra_infos_dict = reward_result
+                            elif isinstance(reward_result, dict):
+                                # For reward managers that return a dict with token_level_scores_dict
+                                reward_tensor = reward_result["reward_tensor"]
+                                reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
+                                token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
+                                # Save each token_level_scores to batch
+                                for reward_fn_name, token_level_scores in token_level_scores_dict.items():
+                                    batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
+                            else:
+                                # Fallback to default handling
+                                reward_tensor, reward_extra_infos_dict = reward_result, {}
+                        
+                        # Save the total token_level_scores
                         batch.batch["token_level_scores"] = reward_tensor
 
+                        # [gdpo] Save token_level_rewards for each reward function in batch.batch
+                        # Extract token_level_scores from reward_extra_infos_dict
                         if reward_extra_infos_dict:
-                            batch.non_tensor_batch.update({k: np.array(v) for k, v in reward_extra_infos_dict.items()})
+                            # Update non_tensor_batch with regular extra info
+                            non_tensor_extra_info = {}
+                            for k, v in reward_extra_infos_dict.items():
+                                if isinstance(v, torch.Tensor):
+                                    # This is a token_level_scores tensor for a specific reward function
+                                    batch.batch[k] = v
+                                else:
+                                    # This is regular extra info
+                                    non_tensor_extra_info[k] = np.array(v)
+                            
+                            # Update non_tensor_batch with regular extra info
+                            if non_tensor_extra_info:
+                                batch.non_tensor_batch.update(non_tensor_extra_info)
 
                         # compute rewards. apply_kl_penalty if available
                         if self.config.algorithm.use_kl_in_reward:
