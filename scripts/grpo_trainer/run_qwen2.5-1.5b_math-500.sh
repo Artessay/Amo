@@ -4,8 +4,8 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_math-500"
-EXPERIMENT_NAME="qwen2.5-1.5b_vanilla"
+PROJECT_NAME="amo_math-500"
+EXPERIMENT_NAME="qwen2.5-1.5b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
@@ -54,7 +54,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$TENSOR_MODEL_PARALLEL_SIZE \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
-    actor_rollout_ref.rollout.mode=async \
+    actor_rollout_ref.rollout.mode=sync \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
@@ -68,5 +68,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
     trainer.save_freq=10 \
-    trainer.test_freq=5 \
+    trainer.test_freq=10 \
     trainer.total_epochs=$EPOCH $@
