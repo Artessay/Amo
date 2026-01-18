@@ -1,8 +1,8 @@
 import os
 import nltk
 
-MIN_RESPONSE_REWARD_LENGTH = int(os.getenv("MIN_RESPONSE_REWARD_LENGTH", "1024"))
-MAX_RESPONSE_REWARD_LENGTH = int(os.getenv("MAX_RESPONSE_REWARD_LENGTH", "2048"))
+MIN_RESPONSE_REWARD_LENGTH = int(os.getenv("MIN_RESPONSE_REWARD_LENGTH", "512"))
+MAX_RESPONSE_REWARD_LENGTH = int(os.getenv("MAX_RESPONSE_REWARD_LENGTH", "1024"))
 
 def count_tokens(text: str) -> int:
     """Count the number of tokens in the given text."""
