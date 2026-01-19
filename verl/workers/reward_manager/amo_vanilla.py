@@ -146,15 +146,11 @@ class AmoVanillaRewardManager(AbstractRewardManager):
                     print(f"[{reward_fn_name} score]", score)
                 print("[reward]", reward)
 
-        # [Amo] Add token_level_scores_dict to reward_extra_info
-        for reward_fn_name, token_level_scores in token_level_scores_dict.items():
-            reward_extra_info[f"token_level_scores_{reward_fn_name}"] = token_level_scores
-
         if return_dict:
             return {
                 "reward_tensor": reward_tensor,
                 "reward_extra_info": reward_extra_info,
-                "token_level_scores_dict": token_level_scores_dict,
+                "token_level_scores_dict": token_level_scores_dict, # [GDPO] Add token level scores
             }
         else:
             return reward_tensor

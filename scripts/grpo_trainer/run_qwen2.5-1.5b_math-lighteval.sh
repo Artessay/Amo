@@ -4,8 +4,8 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_grpo_math-lighteval"
-EXPERIMENT_NAME="qwen2.5-1.5b_vanilla"
+PROJECT_NAME="amo_math-lighteval"
+EXPERIMENT_NAME="qwen2.5-1.5b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-lighteval/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
@@ -20,7 +20,7 @@ EPOCH=50
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=16
+MICRO_BATCH_SIZE_PER_GPU=32
 TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
@@ -30,7 +30,7 @@ python3 -m verl.trainer.main_ppo \
     amo_strategy.method=$AMO_STRATEGY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
-    data.train_batch_size=128 \
+    data.train_batch_size=512 \
     data.max_prompt_length=2048 \
     data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
@@ -41,7 +41,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
@@ -54,8 +54,8 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$TENSOR_MODEL_PARALLEL_SIZE \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
-    actor_rollout_ref.rollout.mode=async \
-    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.rollout.mode=sync \
+    actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
