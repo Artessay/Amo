@@ -6,8 +6,9 @@ echo "Using workspace: $WORKSPACE"
 DATASET="rlla" 
 
 EXPERIMENTS=(
-    "qwen2.5-1.5b"
+    # "qwen2.5-1.5b"
     "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hv"
     
     # "qwen2.5-3b"

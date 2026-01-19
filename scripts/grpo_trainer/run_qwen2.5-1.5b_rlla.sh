@@ -12,11 +12,10 @@ VAL_FILES="$WORKSPACE/data/rlla/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
-AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
 
-EPOCH=20
+EPOCH=50
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -27,7 +26,6 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
-    amo_strategy.method=$AMO_STRATEGY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \
@@ -37,7 +35,7 @@ python3 -m verl.trainer.main_ppo \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
-    actor_rollout_ref.actor.optim.lr=1e-5 \
+    actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \

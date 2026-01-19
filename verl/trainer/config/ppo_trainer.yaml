@@ -330,23 +330,12 @@ amo_strategy:
 
   # Hypervolume (HV) specific configuration
   hv_config:
-    # Strategy for determining the reference point: "static", "dynamic_batch", or "dynamic_datasource"
-    reference_point_strategy: static
 
     # Static reference point for HV computation
-    reference_point: [-1.0, -1.0, -1.0]
-
-    # Margin to add to the reference point when using dynamic strategies
-    reference_point_margin: 0.1
+    reference_point: none
 
     # Whether to clip negative HV contributions to zero
     clip_negative: False
 
     # Reward scaling mode: "min-max", "z-score", or "none"
     reward_scaling_mode: none
-
-    # Number of Monte Carlo samples for HV estimation
-    # mc_sample_count: 1024
-
-    # Whether to normalize objective vectors before HV computation
-    normalize_vectors_for_hv: False

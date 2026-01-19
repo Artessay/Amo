@@ -12,7 +12,6 @@ VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
-AMO_STRATEGY="vanilla"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
@@ -27,7 +26,6 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
-    amo_strategy.method=$AMO_STRATEGY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \

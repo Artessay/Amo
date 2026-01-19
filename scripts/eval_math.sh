@@ -7,16 +7,15 @@ PROJECT_PREFIX="amo_grpo"
 
 DATASETS=(
     "MATH-500" 
-    # "MATH-lighteval"
+    "MATH-lighteval"
 )
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
-    # "qwen2.5-1.5b_grpo"
-    # "qwen2.5-1.5b_vanilla"
-    "qwen2.5-1.5b_hv"
+    "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_gdpo"
+    "qwen2.5-1.5b_hvpo"
     # "qwen2.5-3b"
-    # "llama3-3b"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
