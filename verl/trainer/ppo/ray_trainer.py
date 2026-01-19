@@ -245,6 +245,7 @@ def compute_advantage(
 
         # Get all reward keys that start with "token_level_scores_"
         reward_keys = [key for key in data.batch.keys() if key.startswith("token_level_scores_")]
+        assert len(reward_keys) > 0, "No token_level_scores_* keys found in data.batch"
         
         # Calculate advantage for each reward function
         advantage_score_list = []
@@ -1227,9 +1228,9 @@ class RayPPOTrainer:
 
                                 # [gdpo] Handle token level scores dict
                                 if self.config.algorithm.adv_estimator == AdvantageEstimator.GDPO:
-                                    # [gdpo] get token level scores dict
+                                    # get token level scores dict
                                     token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
-                                    # [gdpo] Save each token_level_scores to batch
+                                    # Save each token_level_scores to batch
                                     for reward_fn_name, token_level_scores in token_level_scores_dict.items():
                                         batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
                             else:
