@@ -1218,17 +1218,20 @@ class RayPPOTrainer:
                         reward_extra_infos_dict: dict[str, list]
                         if self.config.reward_model.launch_reward_fn_async:
                             reward_result = ray.get(future_reward)
-                            # Handle both cases: with and without token_level_scores_dict
                             if isinstance(reward_result, tuple) and len(reward_result) == 2:
                                 reward_tensor, reward_extra_infos_dict = reward_result
                             elif isinstance(reward_result, dict):
                                 # For reward managers that return a dict with token_level_scores_dict
                                 reward_tensor = reward_result["reward_tensor"]
                                 reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
-                                token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
-                                # Save each token_level_scores to batch
-                                for reward_fn_name, token_level_scores in token_level_scores_dict.items():
-                                    batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
+
+                                # [gdpo] Handle token level scores dict
+                                if self.config.algorithm.adv_estimator == AdvantageEstimator.GDPO:
+                                    # [gdpo] get token level scores dict
+                                    token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
+                                    # [gdpo] Save each token_level_scores to batch
+                                    for reward_fn_name, token_level_scores in token_level_scores_dict.items():
+                                        batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
                             else:
                                 # Fallback to default handling
                                 reward_tensor, reward_extra_infos_dict = reward_result, {}
@@ -1236,7 +1239,6 @@ class RayPPOTrainer:
                         # Save the total token_level_scores
                         batch.batch["token_level_scores"] = reward_tensor
 
-                        # [gdpo] Save token_level_rewards for each reward function in batch.batch
                         # Extract token_level_scores from reward_extra_infos_dict
                         if reward_extra_infos_dict:
                             # Update non_tensor_batch with regular extra info

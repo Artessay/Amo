@@ -22,19 +22,11 @@ NUM_GPUS_PER_NODE=2
 MICRO_BATCH_SIZE_PER_GPU=16
 TENSOR_MODEL_PARALLEL_SIZE=1
 
-HV_REFERENCE_POINT_STRATEGY="dynamic_batch" # "static" # "dynamic_batch"
-# HV_REFERENCE_POINT="[-0.0, -0.0]"
-HV_REWARD_SCALING_MODE="none" # "none", "tanh", "min-max", "z-score"
-HV_ENABLE_CLIP_NEGATIVE=False
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
-    amo_strategy.hv_config.reference_point_strategy="$HV_REFERENCE_POINT_STRATEGY" \
-    amo_strategy.hv_config.clip_negative="$HV_ENABLE_CLIP_NEGATIVE" \
-    amo_strategy.hv_config.reward_scaling_mode="$HV_REWARD_SCALING_MODE" \
-    amo_strategy.hv_config.normalize_vectors_for_hv=False \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=128 \

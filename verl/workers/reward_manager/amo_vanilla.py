@@ -150,7 +150,7 @@ class AmoVanillaRewardManager(AbstractRewardManager):
             return {
                 "reward_tensor": reward_tensor,
                 "reward_extra_info": reward_extra_info,
-                "token_level_scores_dict": token_level_scores_dict, # [GDPO] Add token level scores
+                "token_level_scores_dict": token_level_scores_dict, # [gdpo] Add token level scores
             }
         else:
             return reward_tensor
