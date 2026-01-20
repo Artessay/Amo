@@ -5,7 +5,7 @@ echo "Using workspace: $WORKSPACE"
 
 PROJECT_PREFIX="amo_grpo"
 
-DATASET="cnn_dailymail" 
+DATASET="CNN_DailyMail" 
 
 EXPERIMENTS=(
     "qwen2.5-1.5b"

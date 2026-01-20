@@ -10,7 +10,7 @@ DATASETS=(
     # "MATH-lighteval"
     # "PKU-SafeRLHF"
     # "rlla"
-    "cnn_dailymail"
+    "CNN_DailyMail"
 )
 
 if [ -n "$MODEL_PATH" ]; then

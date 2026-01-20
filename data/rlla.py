@@ -26,13 +26,13 @@ np.random.seed(31415)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--local_dir', default='./rlla_4k')
+    parser.add_argument('--local_dir', default='./RLLA')
     args = parser.parse_args()
     
     data_source = 'rlla'
 
     # Load dataset
-    dataset = json.load(open("./dataset/rlla_4k_raw/rlla_rl.json", "r"))
+    dataset = json.load(open("./RLLA/rlla_rl.json", "r"))
 
     # Shuffle dataset
     np.random.shuffle(dataset)

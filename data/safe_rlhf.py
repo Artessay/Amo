@@ -24,24 +24,18 @@ import datasets
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--local_dataset_path", default=None, help="The local path to the raw dataset, if it exists."
-    )
-    parser.add_argument(
         "--local_save_dir", default="./PKU-SafeRLHF", help="The save directory for the preprocessed dataset."
     )
 
     args = parser.parse_args()
-    local_dataset_path = args.local_dataset_path
 
+    train_data_source = "PKU-Alignment/PKU-SafeRLHF-10K"
+    train_dataset = datasets.load_dataset(train_data_source)["train"]
     data_source = "PKU-Alignment/PKU-SafeRLHF"
+    test_dataset = datasets.load_dataset(data_source)["test"]
 
-    if local_dataset_path is not None:
-        dataset = datasets.load_dataset(local_dataset_path)
-    else:
-        dataset = datasets.load_dataset(data_source)
-
-    train_dataset = dataset["train"]
-    test_dataset = dataset["test"]
+    print(f"Train dataset size: {len(train_dataset)}")
+    print(f"Test dataset size: {len(test_dataset)}")
 
     # add a row to each data item that represents a unique id
     def make_map_fn(split):

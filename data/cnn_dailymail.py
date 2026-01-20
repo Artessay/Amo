@@ -53,7 +53,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--local_dir",
-        default="./cnn_dailymail",
+        default="./CNN_DailyMail",
         help="Directory to save the preprocessed parquet files.",
     )
     parser.add_argument(
@@ -65,7 +65,7 @@ def main():
     parser.add_argument(
         "--test_percentage",
         type=float,
-        default=5.0,
+        default=20.0,
         help="Percentage of test data to use (0.0 to 100.0). Default: 5.0",
     )
 
