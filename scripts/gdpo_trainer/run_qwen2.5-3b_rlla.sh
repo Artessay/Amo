@@ -5,12 +5,12 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_rlla"
-EXPERIMENT_NAME="qwen2.5-1.5b_gdpo"
+EXPERIMENT_NAME="qwen2.5-3b_gdpo"
 
 TRAIN_FILES="$WORKSPACE/data/RLLA/train.parquet"
 VAL_FILES="$WORKSPACE/data/RLLA/test.parquet"
 
-MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
@@ -25,6 +25,7 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=gdpo \
+    +reward_model.token_level_score_key=math_accuracy \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \

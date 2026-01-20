@@ -4,18 +4,18 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_rlla"
+PROJECT_NAME="amo_pku-saferlhf"
 EXPERIMENT_NAME="qwen2.5-1.5b_gdpo"
 
-TRAIN_FILES="$WORKSPACE/data/RLLA/train.parquet"
-VAL_FILES="$WORKSPACE/data/RLLA/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
+VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
 
-EPOCH=15
+EPOCH=1
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -29,8 +29,8 @@ python3 -m verl.trainer.main_ppo \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \
-    data.max_prompt_length=2048 \
-    data.max_response_length=1024 \
+    data.max_prompt_length=512 \
+    data.max_response_length=512 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \

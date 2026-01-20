@@ -7,15 +7,15 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_NAME="amo_rlla"
 EXPERIMENT_NAME="qwen2.5-1.5b_grpo"
 
-TRAIN_FILES="$WORKSPACE/data/rlla/train.parquet"
-VAL_FILES="$WORKSPACE/data/rlla/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/RLLA/train.parquet"
+VAL_FILES="$WORKSPACE/data/RLLA/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
 
-EPOCH=30
+EPOCH=15
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
