@@ -37,7 +37,7 @@ class SumEvaluator:
             eval_dims = dims
 
         for dim in eval_dims:
-            print('Evaluating {} of {} samples !!!'.format(dim, n_data))
+            # print('Evaluating {} of {} samples !!!'.format(dim, n_data))
 
             # Calculate average sentence-level scores for 'consistency' and 'fluency'
             if dim == 'consistency' or dim == 'fluency':

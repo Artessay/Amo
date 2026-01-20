@@ -10,7 +10,7 @@ from typing import Any
 
 try:
     # UniEval entry points
-    from recipe.amo_news.metric.evaluator import get_evaluator
+    from recipe.amo_news.metric.evaluator import SumEvaluator
     from recipe.amo_news.metric.utils import convert_to_json
 except ImportError as e:  # pragma: no cover - optional runtime dependency
     raise ImportError(
@@ -18,16 +18,6 @@ except ImportError as e:  # pragma: no cover - optional runtime dependency
         "Please install it via `pip install -r Amo/requirements.txt`."
     ) from e
 
-
-_EVALUATOR = None
-
-
-def get_summarization_evaluator():
-    """Return a cached UniEval summarization evaluator instance."""
-    global _EVALUATOR
-    if _EVALUATOR is None:
-        _EVALUATOR = get_evaluator("summarization")
-    return _EVALUATOR
 
 
 def extract_dimension_score(result: Any, dim: str) -> float:
@@ -77,7 +67,7 @@ def _require_ground_truth(ground_truth: Any, dim: str) -> str:
     return ground_truth
 
 
-def evaluate_dimension(solution_str: str, ground_truth: str, extra_info: dict | None, dim: str) -> float:
+def evaluate_dimension(evaluator: SumEvaluator, solution_str: str, ground_truth: str, extra_info: dict | None, dim: str) -> float:
     """Evaluate a single UniEval summarization dimension.
 
     Args:
@@ -101,6 +91,5 @@ def evaluate_dimension(solution_str: str, ground_truth: str, extra_info: dict | 
     else:
         raise ValueError(f"Unsupported summarization dimension '{dim}'.")
 
-    evaluator = get_summarization_evaluator()
     result = evaluator.evaluate(data, dims=[dim], overall=False, print_result=False)
     return extract_dimension_score(result, dim)

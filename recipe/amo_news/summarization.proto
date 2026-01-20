@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package recipe.amo_news;
+
+// News summarization evaluation service
+service SummarizationEvaluationService {
+  // Evaluate a specific dimension of news summarization
+  rpc EvaluateSummarization (EvaluationRequest) returns (EvaluationResponse) {}
+}
+
+// Evaluation request message
+message EvaluationRequest {
+  // Model-generated summary
+  string solution_str = 1;
+  // Reference summary (used for relevance dimension)
+  string ground_truth = 2;
+  // Original article content (used for coherence and consistency dimensions)
+  string article = 3;
+  // Evaluation dimension: coherence, consistency, fluency, relevance
+  string dimension = 4;
+}
+
+// Evaluation response message
+message EvaluationResponse {
+  // Evaluation score
+  double score = 1;
+}

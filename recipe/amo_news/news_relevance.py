@@ -4,7 +4,7 @@ This module exposes a `compute_score` function with the standard Amo
 signature used by the offline evaluator and reward manager.
 """
 
-from recipe.amo_news.common import evaluate_dimension
+from recipe.amo_news.summarization_client import evaluate_summarization
 
 def compute_score(data_source: str, solution_str: str, ground_truth: str, extra_info: dict = None) -> float:
     """Compute UniEval relevance score for a single summary.
@@ -22,4 +22,4 @@ def compute_score(data_source: str, solution_str: str, ground_truth: str, extra_
     """
     del data_source  # Unused but kept for a uniform Amo metric signature.
 
-    return evaluate_dimension(solution_str, ground_truth, extra_info, dim="relevance")
+    return evaluate_summarization(solution_str, ground_truth, extra_info, dim="relevance")
