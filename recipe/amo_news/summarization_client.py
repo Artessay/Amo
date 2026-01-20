@@ -39,7 +39,8 @@ def evaluate_summarization(solution_str: str, ground_truth: str, extra_info: dic
         )
         
         # Make the RPC call
-        response = stub.EvaluateSummarization(request, timeout=30.0)
+        response = stub.EvaluateSummarization(request)
+        # response = stub.EvaluateSummarization(request, timeout=30.0)
         return response.score
 
 if __name__ == "__main__":

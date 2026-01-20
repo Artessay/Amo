@@ -59,13 +59,13 @@ def main():
     parser.add_argument(
         "--train_percentage",
         type=float,
-        default=5.0,
+        default=1.0,
         help="Percentage of training data to use (0.0 to 100.0). Default: 1.0",
     )
     parser.add_argument(
         "--test_percentage",
         type=float,
-        default=20.0,
+        default=5.0,
         help="Percentage of test data to use (0.0 to 100.0). Default: 5.0",
     )
 

@@ -8,9 +8,9 @@ PROJECT_PREFIX="amo"
 DATASETS=(
     # "MATH-500"
     # "MATH-lighteval"
-    # "PKU-SafeRLHF"
-    # "rlla"
-    "CNN_DailyMail"
+    "PKU-SafeRLHF"
+    # "RLLA"
+    # "CNN_DailyMail"
 )
 
 if [ -n "$MODEL_PATH" ]; then
