@@ -40,7 +40,7 @@ def make_map_fn(data_source: str, split: str):
                 "split": split,
                 "index": example_index,
                 "id": example_id,
-                # "article": article,
+                "article": article,
                 # "highlights": highlights,
             },
         }

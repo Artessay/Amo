@@ -21,10 +21,10 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hv"
 )
 
-# BASE_MODEL="/data/Qwen/Qwen3-4B"
+# BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 # EXPERIMENTS=(
-#     "qwen3-4b_grpo"
-#     "qwen3-4b_vanilla"
+    # "qwen2.5-3b_grpo"
+    # "qwen2.5-3b_gdpo"
 # )
 
 
