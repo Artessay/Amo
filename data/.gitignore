@@ -1,2 +1,2 @@
 mmlu/train.parquet
-cnn_dailymail/train.parquet
+# cnn_dailymail/train.parquet

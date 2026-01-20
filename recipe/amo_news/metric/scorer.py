@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoTokenizer, AutoModelForSeq2SeqLM
-from tqdm import tqdm
 
 class UniEvaluator:
     def __init__(self, model_name_or_path, max_length=1024, device='cuda', cache_dir=None):
@@ -34,7 +33,7 @@ class UniEvaluator:
         tgts = ["No" for _ in range(len(inputs))]
 
         pos_score_list, neg_score_list = [], []
-        for i in tqdm(range(0, len(inputs), batch_size)):
+        for i in range(0, len(inputs), batch_size):
             src_list = inputs[i: i + batch_size]
             tgt_list = tgts[i: i + batch_size]
             try:

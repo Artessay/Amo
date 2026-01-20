@@ -93,3 +93,24 @@ def evaluate_dimension(evaluator: SumEvaluator, solution_str: str, ground_truth:
 
     result = evaluator.evaluate(data, dims=[dim], overall=False, print_result=False)
     return extract_dimension_score(result, dim)
+
+if __name__ == "__main__":
+    from recipe.amo_news.metric.evaluator import get_evaluator
+
+    article = "London (CNN)A 19-year-old man was charged Wednesday with terror offenses after he was arrested as he returned to Britain from Turkey, London's Metropolitan Police said. Yahya Rashid, a UK national from northwest London, was detained at Luton airport on Tuesday after he arrived on a flight from Istanbul, police said. He's been charged with engaging in conduct in preparation of acts of terrorism, and with engaging in conduct with the intention of assisting others to commit acts of terrorism. Both charges relate to the period between November 1 and March 31. Rashid is due to appear in Westminster Magistrates' Court on Wednesday, police said. CNN's Lindsay Isaac contributed to this report."
+    solution_str = "A 19-year-old UK national, Yahya Rashid, was charged with terror offenses after being arrested at Luton airport upon his return from Turkey, according to London's Metropolitan Police. Rashid faces charges of preparing for acts of terrorism and intending to assist others in committing terrorism between November 1 and March 31. He is scheduled to appear in Westminster Magistrates' Court."
+    ground_truth = "London's Metropolitan Police say the man was arrested at Luton airport after landing on a flight from Istanbul .\nHe's been charged with terror offenses allegedly committed since the start of November ."
+
+    evaluator = get_evaluator("summarization")
+    extra_info = {"article": article}
+
+    dim = "relevance"
+
+    score = evaluate_dimension(
+        evaluator=evaluator,
+        solution_str=solution_str,
+        ground_truth=ground_truth,
+        extra_info=extra_info,
+        dim=dim,
+    )
+    print(f"Score for dimension '{dim}': {score}")

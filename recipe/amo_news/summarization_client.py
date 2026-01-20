@@ -20,7 +20,6 @@ def evaluate_summarization(solution_str: str, ground_truth: str, extra_info: dic
     # Get server address from environment variables
     host = os.getenv('NEWS_TARGET_HOST', 'localhost')
     port = os.getenv('NEWS_TARGET_PORT', '50053')
-    print(f"host: {host}, port: {port}")
     
     # Prepare article content if needed
     article = ""
@@ -40,7 +39,7 @@ def evaluate_summarization(solution_str: str, ground_truth: str, extra_info: dic
         )
         
         # Make the RPC call
-        response = stub.EvaluateSummarization(request, timeout=10.0)
+        response = stub.EvaluateSummarization(request, timeout=30.0)
         return response.score
 
 if __name__ == "__main__":
