@@ -44,6 +44,9 @@ def evaluate_summarization(solution_str: str, ground_truth: str, extra_info: dic
         return response.score
 
 if __name__ == "__main__":
+    import dotenv
+    dotenv.load_dotenv()
+    
     # Example usage
     article = "This is a sample article about technology. It discusses the latest advancements in artificial intelligence and their impact on society."
     solution_str = "AI technology is advancing rapidly and affecting various industries."

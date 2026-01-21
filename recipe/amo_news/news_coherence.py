@@ -4,6 +4,9 @@ This module exposes a `compute_score` function with the standard Amo
 signature used by the offline evaluator and reward manager.
 """
 
+import dotenv
+dotenv.load_dotenv()
+
 from recipe.amo_news.summarization_client import evaluate_summarization
 
 def compute_score(data_source: str, solution_str: str, ground_truth: str, extra_info: dict = None) -> float:
