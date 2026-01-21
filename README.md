@@ -14,7 +14,7 @@ pip install -e .[vllm]
 pip install flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
 ```
 
-Download `nltk` punkt tokenizer.
+Download `nltk` punkt tokenizer for math evaluator.
 
 ```bash
 pip install nltk
