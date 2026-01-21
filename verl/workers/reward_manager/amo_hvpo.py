@@ -460,15 +460,13 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Ensure reference point is dominated by all objective vectors in this group
             ref_point = torch.minimum(ref_point, group_min)
 
-            hv_vectors = group_scores
-
             # Compute HV contributions: either group-wise or against the global Pareto cache.
             if use_global_cache_for_batch:
-                group_hv, contributions = self._compute_global_hv_contributions(
-                    hv_vectors, ref_point, pareto_tensor
+                pareto_hv, contributions = self._compute_global_hv_contributions(
+                    group_scores, ref_point, pareto_tensor
                 )
             else:
-                group_hv, contributions = self._compute_group_hv(hv_vectors, ref_point)
+                group_hv, contributions = self._compute_group_hv(group_scores, ref_point)
             assert contributions.shape == (len(indices),)
 
             # Post-process contributions
@@ -480,7 +478,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
                 hv_contributions[global_idx] = contributions[local_idx]
-                total_hv[global_idx] = group_hv
+                total_hv[global_idx] = pareto_hv if use_global_cache_for_batch else group_hv
                 reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
                 cache_sizes[global_idx] = cache_size_for_batch
@@ -727,23 +725,23 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         point: torch.Tensor,  # (dim,)
         pareto_vectors: torch.Tensor,  # (K, dim)
     ) -> torch.Tensor:
-        """计算点到 Pareto 前沿的"改进距离"。
+        """Compute the "improvement distance" from a point to the Pareto front.
         
-        对于被支配的点，返回需要改进多少才能达到前沿。
-        返回值越小表示越接近前沿（越好）。
+        For dominated points, returns the amount of improvement needed to reach the front.
+        Smaller return values indicate proximity to the front (better performance).
         """
         if pareto_vectors.numel() == 0:
             return torch.tensor(0.0, device=point.device)
         
-        # 计算到每个 Pareto 点的"支配距离"
-        # 对于每个维度，计算需要改进的量（负值表示已经更好）
+        # Calculate the "dominance distance" to each Pareto point
+        # For each dimension, calculate the amount of improvement needed (negative values mean already better)
         gaps = pareto_vectors - point.unsqueeze(0)  # (K, dim)
         
-        # 使用最小正向距离（找最容易追赶的点）
-        # 对于每个 Pareto 点，计算最大需要改进的维度
+        # Use minimum positive distance (find the easiest point to catch up to)
+        # For each Pareto point, calculate the maximum dimension that needs improvement
         max_gaps = gaps.max(dim=1).values  # (K,)
         
-        # 找到最容易达到的 Pareto 点
+        # Find the Pareto point that is easiest to reach
         min_distance = max_gaps.min()
         
         return min_distance.clamp(min=0.0)
@@ -753,49 +751,49 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         self,
         delta_hv: float,
         distance: float,
-        alpha: float = 0.1,  # 距离奖励权重
+        alpha: float = 0.1,  # Distance reward weight
     ) -> float:
-        """混合奖励：ΔHV + 距离奖励"""
+        """Hybrid reward: ΔHV + distance reward"""
         if delta_hv > 0:
             return delta_hv
         else:
-            # 被支配时，使用负距离作为奖励（距离越小奖励越高）
+            # For dominated points, use negative distance as reward (smaller distance = higher reward)
             return -alpha * distance
 
-    def _compute_hv_reward(
+    def _compute_hybrid_hv_reward(
         self,
         point: torch.Tensor,
         pareto_vectors: torch.Tensor,
         ref_point: torch.Tensor,
         config: dict,
     ) -> float:
-        """鲁棒的超体积奖励计算。"""
+        """Robust hypervolume reward calculation."""
         
-        # 1. 计算原始 ΔHV
+        # 1. Calculate original ΔHV
         delta_hv = self._compute_delta_hv(point, pareto_vectors, ref_point)
         
         if delta_hv > config.get("hv_threshold", 1e-9):
-            # 有正向贡献，直接返回
+            # Has positive contribution, return directly
             return delta_hv
         
-        # 2. ΔHV = 0 时的备选策略
+        # 2. Fallback strategy when ΔHV = 0
         fallback_strategy = config.get("fallback_strategy", "distance")
         
         if fallback_strategy == "distance":
-            # 使用到前沿的距离
+            # Use distance to the front
             distance = self._compute_distance_to_pareto(point, pareto_vectors)
             max_distance = config.get("max_distance", 1.0)
             return config.get("distance_weight", 0.1) * (1 - distance / max_distance).clamp(0, 1)
         
         elif fallback_strategy == "epsilon":
-            # 使用 ε-支配
+            # Use ε-dominance
             epsilon = config.get("epsilon", 0.05)
             return self._compute_epsilon_hv_contribution(
                 point, pareto_vectors, ref_point, epsilon
             )
         
         elif fallback_strategy == "local":
-            # 使用局部 Pareto 前沿
+            # Use local Pareto front
             local_pareto = self._build_local_pareto_front(
                 point, pareto_vectors, k=config.get("local_k", 50)
             )

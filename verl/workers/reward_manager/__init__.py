@@ -20,7 +20,6 @@ from .prime import PrimeRewardManager
 
 # [Amo] reward manager classes
 from .amo_vanilla import AmoVanillaRewardManager
-from .amo_hv import AmoHvRewardManager
 from .amo_hvpo import AmoHvpoRewardManager
 
 # Note(haibin.lin): no need to include all reward managers here in case of complicated dependencies
@@ -33,7 +32,6 @@ __all__ = [
     "get_reward_manager_cls",
 
     "AmoVanillaRewardManager",
-    "AmoHVRewardManager",
     "AmoHvpoRewardManager"
 ]
 
