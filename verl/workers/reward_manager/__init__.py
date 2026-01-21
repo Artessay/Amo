@@ -21,6 +21,7 @@ from .prime import PrimeRewardManager
 # [Amo] reward manager classes
 from .amo_vanilla import AmoVanillaRewardManager
 from .amo_hv import AmoHvRewardManager
+from .amo_hvpo import AmoHvpoRewardManager
 
 # Note(haibin.lin): no need to include all reward managers here in case of complicated dependencies
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
 
     "AmoVanillaRewardManager",
     "AmoHVRewardManager",
+    "AmoHvpoRewardManager"
 ]
 
 # Import experimental reward managers to ensure they are registered

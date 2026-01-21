@@ -5,14 +5,14 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_math-500"
-EXPERIMENT_NAME="qwen2.5-1.5b_hv"
+EXPERIMENT_NAME="qwen2.5-1.5b_hvpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-500/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-500/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
-REWARD_MANAGER="amo_hv"
+REWARD_MANAGER="amo_hvpo"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
 EPOCH=100
