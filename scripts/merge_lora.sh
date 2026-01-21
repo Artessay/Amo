@@ -23,7 +23,7 @@ DATASETS=(
 
 BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 EXPERIMENTS=(
-    #"qwen2.5-3b_grpo"
+    "qwen2.5-3b_grpo"
     "qwen2.5-3b_gdpo"
 )
 

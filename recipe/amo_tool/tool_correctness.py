@@ -85,8 +85,8 @@ def customize_correctness_reward_tool(solution_str: str, ground_truth: str) -> f
     ans = ground_truth
 
     # tool reward range
-    tool_max_possible = 3.0
-    tool_min_possible = -3.0
+    tool_max_possible = 1.0
+    tool_min_possible = -1.0
 
     # If GT has no tool call, reward is 0.0 in the original code
     if "<tool_call>" not in ans:

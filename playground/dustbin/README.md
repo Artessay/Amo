@@ -49,5 +49,12 @@ pip install modelscope
 ```bash
 modelscope download --model Qwen/Qwen2.5-1.5B-Instruct  --local_dir /data/Qwen/Qwen2.5-1.5B-Instruct
 modelscope download --model Qwen/Qwen2.5-3B-Instruct  --local_dir /data/Qwen/Qwen2.5-3B-Instruct
+modelscope download --model Qwen/Qwen2.5-7B-Instruct  --local_dir /data/Qwen/Qwen2.5-7B-Instruct
+
+modelscope download --model Qwen/Qwen3-0.6B  --local_dir /data/Qwen/Qwen3-0.6B
+modelscope download --model Qwen/Qwen3-1.7B  --local_dir /data/Qwen/Qwen3-1.7B
+modelscope download --model Qwen/Qwen3-4B  --local_dir /data/Qwen/Qwen3-4B
+modelscope download --model Qwen/Qwen3-8B  --local_dir /data/Qwen/Qwen3-8B
+
 modelscope download --model LLM-Research/Llama-3.2-3B-Instruct  --local_dir /data/meta-llama/Llama-3.2-3B-Instruct
 ```
