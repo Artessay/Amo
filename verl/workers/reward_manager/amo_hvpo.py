@@ -323,9 +323,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                     hv_vectors, ref_point, pareto_tensor
                 )
             else:
-                group_hv, hv_without_each = self._compute_group_hv(hv_vectors, ref_point)
-                contributions = group_hv - hv_without_each  # (group_size,)
-                assert contributions.shape == (len(indices),)
+                group_hv, contributions = self._compute_group_hv(hv_vectors, ref_point)
+            assert contributions.shape == (len(indices),)
 
             # Post-process contributions
             if self.clip_negative:
@@ -378,12 +377,12 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         for i in range(batch_size):
             reward_extra_info["hv_contribution"].append(hv_contributions[i].item())
             reward_extra_info["total_hv"].append(total_hv[i].item())
-            reward_extra_info["reference_point"].append(reference_points_per_sample[i])
-            reward_extra_info["group_uid"].append(uids[i])
-            reward_extra_info["dim"].append(dim)
+            # reward_extra_info["reference_point"].append(reference_points_per_sample[i])
+            # reward_extra_info["group_uid"].append(uids[i])
+            # reward_extra_info["dim"].append(dim)
             reward_extra_info["group_size"].append(group_sizes[i])
             reward_extra_info["cache_size"].append(cache_sizes[i])
-            reward_extra_info["used_global_cache"].append(bool(used_global_cache_flags[i]))
+            # reward_extra_info["used_global_cache"].append(bool(used_global_cache_flags[i]))
 
         if return_dict:
             return {
@@ -485,7 +484,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             hv_without_each.append(self._hv_recursive_slicing(sub, ref_point))
 
         hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
-        return hv_total, hv_without_each_tensor
+        contributions = hv_total - hv_without_each  # (group_size,)
+        return hv_total, contributions
 
     def _compute_global_hv_contributions(
         self,
@@ -734,3 +734,44 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         else:
             # 被支配时，使用负距离作为奖励（距离越小奖励越高）
             return -alpha * distance
+
+    def _compute_hv_reward(
+        self,
+        point: torch.Tensor,
+        pareto_vectors: torch.Tensor,
+        ref_point: torch.Tensor,
+        config: dict,
+    ) -> float:
+        """鲁棒的超体积奖励计算。"""
+        
+        # 1. 计算原始 ΔHV
+        delta_hv = self._compute_delta_hv(point, pareto_vectors, ref_point)
+        
+        if delta_hv > config.get("hv_threshold", 1e-9):
+            # 有正向贡献，直接返回
+            return delta_hv
+        
+        # 2. ΔHV = 0 时的备选策略
+        fallback_strategy = config.get("fallback_strategy", "distance")
+        
+        if fallback_strategy == "distance":
+            # 使用到前沿的距离
+            distance = self._compute_distance_to_pareto(point, pareto_vectors)
+            max_distance = config.get("max_distance", 1.0)
+            return config.get("distance_weight", 0.1) * (1 - distance / max_distance).clamp(0, 1)
+        
+        elif fallback_strategy == "epsilon":
+            # 使用 ε-支配
+            epsilon = config.get("epsilon", 0.05)
+            return self._compute_epsilon_hv_contribution(
+                point, pareto_vectors, ref_point, epsilon
+            )
+        
+        elif fallback_strategy == "local":
+            # 使用局部 Pareto 前沿
+            local_pareto = self._build_local_pareto_front(
+                point, pareto_vectors, k=config.get("local_k", 50)
+            )
+            return self._compute_delta_hv(point, local_pareto, ref_point)
+        
+        return 0.0

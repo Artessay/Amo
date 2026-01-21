@@ -28,6 +28,7 @@ HV_REFERENCE_POINT="[-0.0, -0.0, -0.0]"
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
+    amo_strategy.method=hvpo \
     amo_strategy.hv_config.reference_point="$HV_REFERENCE_POINT" \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
