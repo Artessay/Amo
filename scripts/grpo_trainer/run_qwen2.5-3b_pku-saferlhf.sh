@@ -5,7 +5,7 @@ WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
 PROJECT_NAME="amo_pku-saferlhf"
-EXPERIMENT_NAME="qwen2.5-3b_gdpo"
+EXPERIMENT_NAME="qwen2.5-3b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
 VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
@@ -24,7 +24,7 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=gdpo \
+    algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \

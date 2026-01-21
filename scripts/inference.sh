@@ -17,13 +17,21 @@ if [ -n "$MODEL_PATH" ]; then
     unset MODEL_PATH
 fi
 
-MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+#MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
-EXPERIMENTS=(
-    "qwen2.5-1.5b"
+#EXPERIMENTS=(
+    #"qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hv"
+#)
+
+EXPERIMENTS=(
+    #"qwen2.5-3b"
+    # "qwen2.5-3b_grpo"
+     "qwen2.5-3b_gdpo"
+    # "qwen2.5-3b_hv"
 )
 
 # Evaluation
