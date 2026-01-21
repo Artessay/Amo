@@ -4,27 +4,27 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_rlla"
-EXPERIMENT_NAME="qwen2.5-3b_gdpo"
+PROJECT_NAME="amo_news"
+EXPERIMENT_NAME="qwen2.5-3b_grpo"
 
-TRAIN_FILES="$WORKSPACE/data/RLLA/train.parquet"
-VAL_FILES="$WORKSPACE/data/RLLA/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/CNN_DailyMail/train.parquet"
+VAL_FILES="$WORKSPACE/data/CNN_DailyMail/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSPACE/recipe/amo_tool/tool_format.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_news/news_coherence.py','$WORKSPACE/recipe/amo_news/news_fluency.py','$WORKSPACE/recipe/amo_news/news_relevance.py','$WORKSPACE/recipe/amo_news/news_consistency.py']"
 
 EPOCH=15
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=16
+MICRO_BATCH_SIZE_PER_GPU=32
 TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=gdpo \
+    algorithm.adv_estimator=grpo \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
