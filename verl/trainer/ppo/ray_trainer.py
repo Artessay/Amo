@@ -1154,12 +1154,28 @@ class RayPPOTrainer:
                             reward_tensor = self.rm_wg.compute_rm_score(batch)
                             batch = batch.union(reward_tensor)
 
+                        reward_extra_infos_dict: dict[str, list] = {}
                         if self.config.reward_model.launch_reward_fn_async:
                             future_reward = compute_reward_async.remote(
                                 data=batch, config=self.config, tokenizer=self.tokenizer
                             )
                         else:
-                            reward_tensor, reward_extra_infos_dict = compute_reward(batch, self.reward_fn)
+                            # Handle sync reward computation
+                            reward_result = None
+                            try:
+                                reward_result = self.reward_fn(batch, return_dict=True)
+                                reward_tensor = reward_result["reward_tensor"]
+                                reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
+                                
+                                # [gdpo] Handle token level scores dict for sync case
+                                if self.config.algorithm.adv_estimator == AdvantageEstimator.GDPO:
+                                    token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
+                                    for reward_fn_name, token_level_scores in token_level_scores_dict.items():
+                                        batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
+                            except Exception as e:
+                                print(f"Error in reward_fn: {e}")
+                                reward_tensor = self.reward_fn(batch)
+                                reward_extra_infos_dict = {}
 
                     # Operating Mode Selection:
                     # - Bypass mode: Sets old_log_probs = rollout_log_probs (2 policies: π_rollout, π_θ)
@@ -1216,7 +1232,6 @@ class RayPPOTrainer:
 
                     with marked_timer("adv", timing_raw, color="brown"):
                         # we combine with rule-based rm
-                        reward_extra_infos_dict: dict[str, list]
                         if self.config.reward_model.launch_reward_fn_async:
                             reward_result = ray.get(future_reward)
                             if isinstance(reward_result, tuple) and len(reward_result) == 2:
