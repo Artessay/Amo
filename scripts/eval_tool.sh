@@ -3,7 +3,7 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-DATASET="rlla" 
+DATASET="RLLA" 
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"

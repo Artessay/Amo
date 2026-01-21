@@ -11,7 +11,7 @@ DATASETS=(
     "MATH-500"
     "MATH-lighteval"
     # "PKU-SafeRLHF"
-    "rlla"
+    "RLLA"
 )
 
 #BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
