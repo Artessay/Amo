@@ -80,13 +80,18 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         hv_config = dict(hv_config) if hv_config is not None else {}
         self.hv_config: dict[str, Any] = hv_config
 
+        # Reference point configuration
+        self.reference_point_strategy: str = hv_config.get("reference_point_strategy", "static")
+
         # Only used when strategy == "static"
         self.reference_point = hv_config.get("reference_point", None)
-        if self.reference_point is None:
+        # Margin to subtract from min objective values when using dynamic reference points
+        self.reference_point_margin: float = float(hv_config.get("reference_point_margin", 0.0))
+
+        if self.reference_point_strategy == "static" and self.reference_point is None:
             raise ValueError(
                 "[Amo][HV] reference_point_strategy is 'static' but 'reference_point' is not provided."
             )
-        self.static_ref_point = torch.tensor(self.reference_point, dtype=torch.float32)
 
         # Reward post-processing
         self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
@@ -230,11 +235,17 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
         dim = score_tensor.shape[1]
 
         # Prepare static reference point if configured
-        static_ref_point = self.static_ref_point
-        if static_ref_point.numel() != dim:
-            raise ValueError(
-                f"[Amo][HV] reference_point dimension mismatch: got {static_ref_point.numel()}, expected {dim}."
-            )
+        static_ref_point: torch.Tensor | None = None
+        if self.reference_point_strategy == "static":
+            if self.reference_point is None:
+                raise ValueError(
+                    "[Amo][HV] reference_point_strategy is 'static' but 'reference_point' is not provided."
+                )
+            static_ref_point = torch.tensor(self.reference_point, dtype=torch.float32)
+            if static_ref_point.numel() != dim:
+                raise ValueError(
+                    f"[Amo][HV] reference_point dimension mismatch: got {static_ref_point.numel()}, expected {dim}."
+                )
 
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
@@ -281,7 +292,23 @@ class AmoHvRewardManager(AmoVanillaRewardManager):
 
             # Determine reference point for this group
             group_min = group_scores.min(dim=0).values
-            ref_point = static_ref_point.to(dtype=group_scores.dtype, device=group_scores.device)
+            if self.reference_point_strategy == "dynamic_batch":
+                if use_global_cache_for_batch and pareto_tensor.numel() > 0:
+                    # Use the union of the global Pareto frontier and the current group's
+                    # objective vectors to determine the reference point, then clamp so
+                    # that it is dominated by all group points.
+                    all_points = torch.cat([group_scores, pareto_tensor], dim=0)
+                    union_min = all_points.min(dim=0).values
+                    ref_point = union_min - self.reference_point_margin
+                else:
+                    ref_point = group_min - self.reference_point_margin
+            elif self.reference_point_strategy == "static":
+                assert static_ref_point is not None
+                ref_point = static_ref_point.to(dtype=group_scores.dtype, device=group_scores.device)
+            else:
+                raise ValueError(
+                    f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
+                )
 
             # Ensure reference point is dominated by all objective vectors in this group
             ref_point = torch.minimum(ref_point, group_min)

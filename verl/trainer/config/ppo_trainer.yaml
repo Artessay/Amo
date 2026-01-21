@@ -330,9 +330,14 @@ amo_strategy:
 
   # Hypervolume (HV) specific configuration
   hv_config:
+    # Strategy for determining the reference point: "static", "dynamic_batch", or "dynamic_datasource"
+    reference_point_strategy: static
 
     # Static reference point for HV computation
     reference_point: none
+
+    # Margin to add to the reference point when using dynamic strategies
+    reference_point_margin: 0.0
 
     # Whether to clip negative HV contributions to zero
     clip_negative: False
