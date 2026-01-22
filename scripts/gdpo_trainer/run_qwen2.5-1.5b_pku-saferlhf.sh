@@ -15,7 +15,7 @@ MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
 
-EPOCH=20
+EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
