@@ -15,7 +15,7 @@ MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
 
-EPOCH=10
+EPOCH=15
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -24,7 +24,7 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=gdpo \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \

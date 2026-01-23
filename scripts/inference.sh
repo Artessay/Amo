@@ -7,10 +7,10 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    # "MATH-lighteval"
+    "MATH-lighteval"
     "PKU-SafeRLHF"
-    # "RLLA"
-    # "CNN_DailyMail"
+    "RLLA"
+    "CNN_DailyMail"
 )
 
 if [ -n "$MODEL_PATH" ]; then
@@ -18,20 +18,20 @@ if [ -n "$MODEL_PATH" ]; then
 fi
 
 #MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
-MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
-
-#EXPERIMENTS=(
-    #"qwen2.5-1.5b"
-    # "qwen2.5-1.5b_grpo"
-    # "qwen2.5-1.5b_gdpo"
-    # "qwen2.5-1.5b_hv"
-#)
+#MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
 EXPERIMENTS=(
-    #"qwen2.5-3b"
-    # "qwen2.5-3b_grpo"
-     "qwen2.5-3b_gdpo"
-    # "qwen2.5-3b_hv"
+    # "qwen2.5-1.5b"
+    "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_gdpo"
+
+    # "qwen2.5-3b"
+    "qwen2.5-3b_grpo"
+    "qwen2.5-3b_gdpo"
+
+    # "llama3.2-3b"
+    "llama3.2-3b_grpo"
+    "llama3.2-3b_gdpo"
 )
 
 # Evaluation
@@ -56,6 +56,10 @@ for DATASET in "${DATASETS[@]}"; do
         fi
 
         OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
+        if [ -f "$OUTPUT_PATH" ]; then
+            echo "Output file already exists: $OUTPUT_PATH"
+            continue
+        fi
         
         python3 playground/generation.py \
             --model $MODEL_PATH \

@@ -8,30 +8,24 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_PREFIX="amo"
 
 DATASETS=(
-    "MATH-500"
+    #"MATH-500"
     "MATH-lighteval"
-    # "PKU-SafeRLHF"
+    "PKU-SafeRLHF"
     "RLLA"
+    "CNN_DailyMail"
 )
 
-#BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
-#EXPERIMENTS=(
-    #"qwen2.5-1.5b_grpo"
-    #"qwen2.5-1.5b_gdpo"
-    # "qwen2.5-1.5b_hv"
-#)
+# BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
+# EXPERIMENTS=(
+#     "qwen2.5-1.5b_grpo"
+#     "qwen2.5-1.5b_gdpo"
+# )
 
 BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 EXPERIMENTS=(
     "qwen2.5-3b_grpo"
     "qwen2.5-3b_gdpo"
 )
-
-# BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
-# EXPERIMENTS=(
-    # "qwen2.5-3b_grpo"
-    # "qwen2.5-3b_gdpo"
-# )
 
 
 # Merge LoRA checkpoints
