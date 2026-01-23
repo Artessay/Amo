@@ -4,41 +4,39 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_pku-saferlhf"
-EXPERIMENT_NAME="qwen2.5-3b_grpo"
+PROJECT_NAME="amo_news"
+EXPERIMENT_NAME="llama3.2-3b_gdpo"
 
-TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
-VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
+TRAIN_FILES="$WORKSPACE/data/CNN_DailyMail/train.parquet"
+VAL_FILES="$WORKSPACE/data/CNN_DailyMail/test.parquet"
 
-MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
+MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_news/news_coherence.py','$WORKSPACE/recipe/amo_news/news_fluency.py','$WORKSPACE/recipe/amo_news/news_relevance.py','$WORKSPACE/recipe/amo_news/news_consistency.py']"
 
 EPOCH=15
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=32
+MICRO_BATCH_SIZE_PER_GPU=16
 TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=gdpo \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \
-    data.max_prompt_length=512 \
-    data.max_response_length=512 \
+    data.max_prompt_length=2048 \
+    data.max_response_length=1024 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=5e-6 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.model.lora_rank=32 \
-    actor_rollout_ref.model.lora_alpha=16 \
     actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.actor.use_kl_loss=True \
@@ -53,7 +51,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.mode=sync \
-    actor_rollout_ref.rollout.n=4 \
+    actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
