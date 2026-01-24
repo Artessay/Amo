@@ -27,12 +27,6 @@ Install `grpcio-tools` to generate gRPC code.
 pip install grpcio-tools
 ```
 
-Install `python-dotenv` to load environment variables from `.env` file.
-
-```bash
-pip install python-dotenv
-```
-
 Login to `swanlab`
 
 ```bash

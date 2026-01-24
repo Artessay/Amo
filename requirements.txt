@@ -16,6 +16,7 @@ prettytable
 pyarrow>=19.0.0
 pybind11
 pylatexenc
+python-dotenv
 pre-commit
 ray[default]
 rich

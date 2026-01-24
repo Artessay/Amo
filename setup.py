@@ -40,6 +40,7 @@ install_requires = [
     "pyarrow>=19.0.0",
     "pybind11",
     "pylatexenc",
+    "python-dotenv"
     "ray[default]>=2.41.0",
     "rich",
     "torch==2.8.0",
