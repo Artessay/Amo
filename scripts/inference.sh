@@ -7,8 +7,8 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    "MATH-lighteval"
-    # "PKU-SafeRLHF"
+    #"MATH-lighteval"
+     "PKU-SafeRLHF"
     # "RLLA"
     # "CNN_DailyMail"
 )
@@ -29,8 +29,8 @@ EXPERIMENTS=(
     # "qwen2.5-3b_grpo"
     # "qwen2.5-3b_gdpo"
 
-    # "llama3.2-3b"
-    # "llama3.2-3b_grpo"
+    #"llama3.2-3b"
+    #"llama3.2-3b_grpo"
     "llama3.2-3b_gdpo"
 )
 
