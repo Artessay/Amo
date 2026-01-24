@@ -1,5 +1,6 @@
 import os
 import grpc
+import time
 
 from recipe.amo_news import summarization_pb2, summarization_pb2_grpc
 
@@ -63,6 +64,9 @@ if __name__ == "__main__":
     print(f"Ground truth: {ground_truth}")
     print("=" * 60)
     
+    # Start timing
+    start_time = time.time()
+    
     for dim in dimensions:
         try:
             score = evaluate_summarization(
@@ -75,5 +79,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error evaluating {dim}: {e}")
     
+    # Calculate and print execution time
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
     print("=" * 60)
     print("Test completed.")
+    print(f"Execution time for all dimensions: {execution_time:.4f} seconds")
