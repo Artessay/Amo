@@ -1,5 +1,5 @@
 set -x
-export CUDA_VISIBLE_DEVICES=3
+
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
@@ -17,19 +17,20 @@ if [ -n "$MODEL_PATH" ]; then
     unset MODEL_PATH
 fi
 
-#MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
-#MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
+# MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
+# MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
 
-    # "qwen2.5-3b"
-     "qwen2.5-3b_grpo"
-     "qwen2.5-3b_gdpo"
+    "qwen2.5-3b"
+    # "qwen2.5-3b_grpo"
+    # "qwen2.5-3b_gdpo"
 
-    #"llama3.2-3b"
+    # "llama3.2-3b"
     #"llama3.2-3b_grpo"
     #"llama3.2-3b_gdpo"
 )

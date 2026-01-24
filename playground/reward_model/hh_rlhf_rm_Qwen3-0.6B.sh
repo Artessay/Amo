@@ -1,10 +1,6 @@
 #!/usr/bin/env bash 
 set -e
 
-export CUDA_VISIBLE_DEVICES=1,3
-
-rm -rf /home/ssr/.cache/torch_extensions/fused_adam || true
-
 export TORCH_CUDA_ARCH_LIST="8.6"
 export DEEPSPEED_BUILD_FUSED_ADAM=1
 export CUDA_HOME="/usr/local/cuda"
