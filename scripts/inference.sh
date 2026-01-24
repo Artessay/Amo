@@ -7,8 +7,8 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    "MATH-lighteval"
-    #"PKU-SafeRLHF"
+    #"MATH-lighteval"
+    "PKU-SafeRLHF"
     #"RLLA"
     #"CNN_DailyMail"
 )
@@ -22,11 +22,11 @@ fi
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
-    "qwen2.5-1.5b_grpo"
-    "qwen2.5-1.5b_gdpo"
+    # "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b_gdpo"
 
-    # "qwen2.5-3b"
-    #"qwen2.5-3b_grpo"
+    "qwen2.5-3b"
+    "qwen2.5-3b_grpo"
     #"qwen2.5-3b_gdpo"
 
     # "llama3.2-3b"
@@ -50,7 +50,11 @@ for DATASET in "${DATASETS[@]}"; do
             fi
 
             LATEST_STEP=$(cat "$STEP_FILE_PATH")
-            MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge"
+            if [[ "${EXPERIMENT_NAME}" == *llama* ]]; then
+                MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor"
+            else
+                MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge"
+            fi
 
             if [ ! -d "$MODEL_PATH" ]; then
                 echo "Model path not found: $MODEL_PATH"
