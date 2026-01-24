@@ -3,13 +3,11 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_PREFIX="amo_grpo"
-
 DATASET="CNN_DailyMail" 
 
 EXPERIMENTS=(
-    "qwen2.5-1.5b"
-    # "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b"
+    "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hvpo"
 

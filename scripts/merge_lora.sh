@@ -8,30 +8,30 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_PREFIX="amo"
 
 DATASETS=(
-    #"MATH-500"
-    #"MATH-lighteval"
-    "PKU-SafeRLHF"
-    #"RLLA"
-    #"CNN_DailyMail"
+    # "MATH-500"
+    "MATH-lighteval"
+    # "PKU-SafeRLHF"
+    # "RLLA"
+    # "CNN_DailyMail"
 )
 
- #BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
- #EXPERIMENTS=(
-     #"qwen2.5-1.5b_grpo"
-     #"qwen2.5-1.5b_gdpo"
- #)
+# BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
+# EXPERIMENTS=(
+#     "qwen2.5-1.5b_grpo"
+#     "qwen2.5-1.5b_gdpo"
+# )
 
-BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
-EXPERIMENTS=(
-    "qwen2.5-3b_grpo"
-#    "qwen2.5-3b_gdpo"
-)
+# BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
+# EXPERIMENTS=(
+#     "qwen2.5-3b_grpo"
+#     "qwen2.5-3b_gdpo"
+# )
 
 #BASE_MODEL="/data/meta-llama/Llama-3.2-3B-Instruct"
-#EXPERIMENTS=(
+EXPERIMENTS=(
 #    "llama3.2-3b_grpo"
-#    "llama3.2-3b_gdpo"
-#)
+   "llama3.2-3b_gdpo"
+)
 
 
 # Merge LoRA checkpoints
@@ -56,13 +56,11 @@ for DATASET in "${DATASETS[@]}"; do
         fi
 
         if [ ! -d $ADAPTER_PATH ]; then
-            mkdir -p $SAVE_PATH
-            
             ACTOR_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/"
-            cp -r $ACTOR_PATH/* $SAVE_PATH/
-
-            mv $SAVE_PATH/huggingface/* $SAVE_PATH/
-            rmdir $SAVE_PATH/huggingface
+            python playground/legacy_model_merger.py merge \
+                --backend fsdp \
+                --local_dir $ACTOR_PATH \
+                --target_dir $SAVE_PATH
         else
             python3 playground/lora_merger.py \
                 --model_path $BASE_MODEL \

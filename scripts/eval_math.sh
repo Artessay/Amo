@@ -3,8 +3,6 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_PREFIX="amo_grpo"
-
 DATASETS=(
     #"MATH-500" 
     "MATH-lighteval"
@@ -22,7 +20,7 @@ EXPERIMENTS=(
 
     #"llama3.2-3b"
     #"llama3.2-3b_grpo"
-    #"llama3.2-3b_gdpo"
+    "llama3.2-3b_gdpo"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"

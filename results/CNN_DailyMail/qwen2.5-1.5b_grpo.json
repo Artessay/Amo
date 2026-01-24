@@ -1,0 +1,8 @@
+{
+    "abisee/cnn_dailymail": {
+        "news_coherence": 0.9582672084140765,
+        "news_fluency": 0.9451012213720628,
+        "news_relevance": 0.8920749172291155,
+        "news_consistency": 0.9437387234561965
+    }
+}
