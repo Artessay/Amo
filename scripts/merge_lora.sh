@@ -55,10 +55,19 @@ for DATASET in "${DATASETS[@]}"; do
             continue
         fi
 
-        python3 playground/lora_merger.py \
-            --model_path $BASE_MODEL \
-            --adapter_path $ADAPTER_PATH \
-            --save_path $SAVE_PATH
+        if [ ! -d $ADAPTER_PATH ]; then
+            mkdir -p $SAVE_PATH
+            
+            ACTOR_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/"
+            cp -r $ACTOR_PATH/* $SAVE_PATH/
 
+            mv $SAVE_PATH/huggingface/* $SAVE_PATH/
+            rmdir $SAVE_PATH/huggingface
+        else
+            python3 playground/lora_merger.py \
+                --model_path $BASE_MODEL \
+                --adapter_path $ADAPTER_PATH \
+                --save_path $SAVE_PATH
+        fi
     done
 done

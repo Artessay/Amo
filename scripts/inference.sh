@@ -50,11 +50,7 @@ for DATASET in "${DATASETS[@]}"; do
             fi
 
             LATEST_STEP=$(cat "$STEP_FILE_PATH")
-            if [[ "${EXPERIMENT_NAME}" == *llama* ]]; then
-                MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor"
-            else
-                MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge"
-            fi
+            MODEL_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/merge"
 
             if [ ! -d "$MODEL_PATH" ]; then
                 echo "Model path not found: $MODEL_PATH"
