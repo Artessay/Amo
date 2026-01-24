@@ -25,7 +25,6 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
-    +reward_model.token_level_score_key=math_accuracy \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
