@@ -10,16 +10,16 @@ PROJECT_PREFIX="amo"
 DATASETS=(
     # "MATH-500"
     #"MATH-lighteval"
-    # "PKU-SafeRLHF"
-     "RLLA"
+     "PKU-SafeRLHF"
+    # "RLLA"
     # "CNN_DailyMail"
 )
 
-# BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
-# EXPERIMENTS=(
-#     "qwen2.5-1.5b_grpo"
-#     "qwen2.5-1.5b_gdpo"
-# )
+#BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
+#EXPERIMENTS=(
+    # "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b_gdpo"
+ #)
 
 BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 EXPERIMENTS=(

@@ -15,7 +15,7 @@ MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_news/news_coherence.py','$WORKSPACE/recipe/amo_news/news_fluency.py','$WORKSPACE/recipe/amo_news/news_relevance.py','$WORKSPACE/recipe/amo_news/news_consistency.py']"
 
-EPOCH=15
+EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2

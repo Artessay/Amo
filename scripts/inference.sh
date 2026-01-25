@@ -8,8 +8,8 @@ PROJECT_PREFIX="amo"
 DATASETS=(
     # "MATH-500"
     #"MATH-lighteval"
-    # "PKU-SafeRLHF"
-     "RLLA"
+     "PKU-SafeRLHF"
+    # "RLLA"
     # "CNN_DailyMail"
 )
 
@@ -18,7 +18,7 @@ if [ -n "$MODEL_PATH" ]; then
 fi
 
 # MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
-MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
+# MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 # MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
 EXPERIMENTS=(
@@ -27,8 +27,8 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_gdpo"
 
     "qwen2.5-3b"
-    # "qwen2.5-3b_grpo"
-    # "qwen2.5-3b_gdpo"
+    "qwen2.5-3b_grpo"
+    "qwen2.5-3b_gdpo"
 
     # "llama3.2-3b"
     #"llama3.2-3b_grpo"
@@ -41,7 +41,7 @@ for DATASET in "${DATASETS[@]}"; do
         DATASET_NAME="${DATASET,,}"
         DATA_PATH="$WORKSPACE/data/$DATASET/test.parquet"
 
-        if [ ! -d "$MODEL_PATH" ]; then
+        if [[ $EXPERIMENT_NAME == *_* ]]; then
             PROJECT_NAME="${PROJECT_PREFIX}_${DATASET_NAME}"
             STEP_FILE_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/latest_checkpointed_iteration.txt"
             
@@ -58,7 +58,12 @@ for DATASET in "${DATASETS[@]}"; do
                 continue
             fi
         else
-            echo "Using predefined MODEL_PATH: $MODEL_PATH"
+            if [ ! -d "$MODEL_PATH" ]; then
+                echo "Error: MODEL_PATH not found for $EXPERIMENT_NAME"
+                continue
+            else
+                echo "Using predefined MODEL_PATH: $MODEL_PATH"
+            fi
         fi
 
         OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
