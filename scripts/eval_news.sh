@@ -8,10 +8,12 @@ DATASET="CNN_DailyMail"
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
-    "qwen2.5-1.5b_gdpo"
+    # "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hvpo"
 
-    # "qwen2.5-3b"
+    "qwen2.5-3b"
+
+    "llama3.2-3b"
 )
 
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_news/news_coherence.py','$WORKSPACE/recipe/amo_news/news_fluency.py','$WORKSPACE/recipe/amo_news/news_relevance.py','$WORKSPACE/recipe/amo_news/news_consistency.py']"
