@@ -7,8 +7,8 @@ DATASET="CNN_DailyMail"
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
-    "qwen2.5-1.5b_grpo"
-    # "qwen2.5-1.5b_gdpo"
+    # "qwen2.5-1.5b_grpo"
+    "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hvpo"
 
     # "qwen2.5-3b"
