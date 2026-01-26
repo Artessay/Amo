@@ -17,6 +17,7 @@ def customize_format_reward_func(solution_str: str, ground_truth: str) -> float:
     max_possible_reward = 1.0
     min_possible_reward = 0.0
     half_possible_reward = (max_possible_reward + min_possible_reward) / 2.0
+    quarter_possible_reward = (min_possible_reward + half_possible_reward) / 2.0
 
     # Common <think> block (allow arbitrary whitespace)
     think_pattern = r"<think>\s*.*?\s*</think>"
@@ -80,13 +81,16 @@ def customize_format_reward_func(solution_str: str, ground_truth: str) -> float:
         and response.count("</response>") == 1
     )
 
-    # Half credit if it starts with a well-formed <think>...</think> block
+    # Half credit if it contains ONLY ONE of the blocks: <think> OR <tool_call> OR <response>
+    if has_only_think or has_only_tool_call or has_only_response:
+        return quarter_possible_reward
+
+    # Quarter credit if it starts with a well-formed <think>...</think> block
     # but the remaining content does NOT satisfy the expected overall format.
     starts_with_think_block = bool(
         re.search(rf"^\s*{think_pattern}", response, re.DOTALL)
     )
-
-    if has_only_think or has_only_tool_call or has_only_response or starts_with_think_block:
+    if starts_with_think_block:
         return half_possible_reward
 
     return min_possible_reward

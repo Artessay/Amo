@@ -18,8 +18,10 @@ REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_tool/tool_correctness.py','$WORKSP
 EPOCH=15
 
 NUM_NODES=1
-NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=16
+# NUM_GPUS_PER_NODE=2
+# MICRO_BATCH_SIZE_PER_GPU=16
+NUM_GPUS_PER_NODE=4
+MICRO_BATCH_SIZE_PER_GPU=8
 TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
@@ -51,7 +53,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
     actor_rollout_ref.rollout.mode=sync \
-    actor_rollout_ref.rollout.n=4 \
+    actor_rollout_ref.rollout.n=2 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \

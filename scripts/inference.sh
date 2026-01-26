@@ -32,7 +32,7 @@ EXPERIMENTS=(
 
     # "llama3.2-3b"
     "llama3.2-3b_grpo"
-    "llama3.2-3b_gdpo"
+    # "llama3.2-3b_gdpo"
 )
 
 # Evaluation
@@ -67,10 +67,10 @@ for DATASET in "${DATASETS[@]}"; do
         fi
 
         OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
-        if [ -f "$OUTPUT_PATH" ]; then
-            echo "Output file already exists: $OUTPUT_PATH"
-            continue
-        fi
+        # if [ -f "$OUTPUT_PATH" ]; then
+        #     echo "Output file already exists: $OUTPUT_PATH"
+        #     continue
+        # fi
         
         python3 playground/generation.py \
             --model $MODEL_PATH \
