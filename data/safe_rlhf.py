@@ -69,7 +69,7 @@ if __name__ == "__main__":
                 ],
                 "ability": "alignment",
                 "reward_model": {
-                    "style": "model",
+                    "style": "rule",
                     "ground_truth": "",  # should not be used
                 },
                 "extra_info": {

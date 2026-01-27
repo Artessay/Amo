@@ -236,15 +236,15 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             split = extra_info.get("split")
             assert split in ["train", "val", "test"], f"split should be 'train', 'val', or 'test', but got {split}"
 
-            # Try to get index from extra_info, which should be the same for all responses from the same prompt
-            index = extra_info.get("index")
-            assert index is not None, "index should not be None"
-            # Generate a stable uid based on split and index
-            uid = f"{split}_{index}"
+            # # Try to get index from extra_info, which should be the same for all responses from the same prompt
+            # index = extra_info.get("index")
+            # assert index is not None, "index should not be None"
+            # # Generate a stable uid based on split and index
+            # uid = f"{split}_{index}"
             
-            # # Use uid from non_tensor_batch 
-            # uid = data_item.non_tensor_batch.get("uid")
-            # assert uid is not None, "uid should not be None"
+            # Use uid from non_tensor_batch 
+            uid = data_item.non_tensor_batch.get("uid")
+            assert uid is not None, "uid should not be None"
 
             uids.append(uid)
             data_splits.append(split)
@@ -289,20 +289,25 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         assert all(split == data_splits[0] for split in data_splits), "All elements in data_splits should be the same"
         need_estimate_pareto_front: bool = data_splits[0] != "train"
-        new_pareto_frontier_points: List[list[float]] = []
 
         for group_uid, indices in uid2indices.items():
+            # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
             group_scores = score_tensor[indices]  # (group_size, dim)
             if group_scores.numel() == 0:
                 continue
 
             # Compute HV contributions against the global Pareto cache.
-            contributions = self._compute_hybrid_reward(
-                group_scores, ref_point, pareto_tensor
-            )
-            assert contributions.shape == (len(indices),)
+            if need_estimate_pareto_front:
+                # set to 0 if need to estimate pareto front, because we don't need contribution
+                # contributions = torch.zeros(len(indices), dtype=torch.float32)
+                reward = 
+            else:
+                contributions = self._compute_hybrid_reward(
+                    group_scores, ref_point, pareto_tensor
+                )
+                assert contributions.shape == (len(indices),)
 
-            contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
+                contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):

@@ -64,7 +64,7 @@
     "ability": "alignment",
     "reward_model": {
         "ground_truth": "",
-        "style": "model"
+        "style": "rule"
     },
     "extra_info": {
         "index": 0,
