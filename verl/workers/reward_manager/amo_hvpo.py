@@ -284,42 +284,41 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         if need_estimate_pareto_front:
             # update pareto cache
             pareto_cache_point = score_tensor.mean(dim=0).tolist()
-            print(f"[Amo][HV] Eval Pareto cache snapshot size: {self.pareto_cache.size()}")
-            print(f"[Amo][HV] Eval pareto_cache_point: {pareto_cache_point}")
             self.pareto_cache.update(pareto_cache_point)
-            print(f"[Amo][HV] Added Pareto cache snapshot size: {self.pareto_cache.size()}")
+            print(f"[Amo][HV] Added point {pareto_cache_point} to Pareto cache, current size: {self.pareto_cache.size()}")
 
             # calculate reward through mean of individual scores
             hybrid_rewards = score_tensor.mean(dim=1)
-        else:
-            # Group indices by uid
-            uid2indices: dict[str, list[int]] = defaultdict(list)
-            for idx, uid in enumerate(uids):
-                uid2indices[uid].append(idx)
-            # print(f"[Amo][HV] uid2indices: {uid2indices}")
+            
+        # Group indices by uid
+        uid2indices: dict[str, list[int]] = defaultdict(list)
+        for idx, uid in enumerate(uids):
+            uid2indices[uid].append(idx)
+        # print(f"[Amo][HV] uid2indices: {uid2indices}")
 
-            for group_uid, indices in uid2indices.items():
-                # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
-                group_scores = score_tensor[indices]  # (group_size, dim)
-                if group_scores.numel() == 0:
-                    continue
+        for group_uid, indices in uid2indices.items():
+            # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
+            group_scores = score_tensor[indices]  # (group_size, dim)
+            if group_scores.numel() == 0:
+                continue
 
-                # Compute HV contributions against the global Pareto cache.
-                contributions = self._compute_hybrid_reward(
-                    group_scores, ref_point, pareto_tensor
-                )
-                assert contributions.shape == (len(indices),)
+            # Compute HV contributions against the global Pareto cache.
+            contributions = self._compute_hybrid_reward(
+                group_scores, ref_point, pareto_tensor
+            )
+            assert contributions.shape == (len(indices),)
 
-                contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
+            contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
-                # Write rewards to the last token position and fill extra info
-                for local_idx, global_idx in enumerate(indices):
-                    contribution = contributions[local_idx]
-                    
+            # Write rewards to the last token position and fill extra info
+            for local_idx, global_idx in enumerate(indices):
+                contribution = contributions[local_idx]
+                
+                if not need_estimate_pareto_front:
                     hybrid_rewards[global_idx] = contribution
-                    hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
-                    distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
-                    # reference_points_per_sample[global_idx] = ref_point.tolist()
+                hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
+                distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
+                # reference_points_per_sample[global_idx] = ref_point.tolist()
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
