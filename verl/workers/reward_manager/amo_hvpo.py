@@ -266,7 +266,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # ------------------------------------------------------------------
         # HV computation
         # ------------------------------------------------------------------
-        score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
+        score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)    # (batch_size, num_objectives)
 
         # Get Pareto cache snapshot for this batch
         pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
@@ -274,34 +274,35 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Determine reference point for this group
         ref_point = self._compute_reference_point(score_tensor, pareto_tensor)
 
-        # Group indices by uid
-        uid2indices: dict[str, list[int]] = defaultdict(list)
-        for idx, uid in enumerate(uids):
-            uid2indices[uid].append(idx)
-        print(f"[Amo][HV] uid2indices: {uid2indices}")
-
+        hybrid_rewards = torch.zeros(len(uids), dtype=torch.float32)
         hv_contributions = torch.zeros(len(uids), dtype=torch.float32)
         distance_penalty = torch.zeros(len(uids), dtype=torch.float32)
-        group_sizes = [0 for _ in range(len(uids))]
-
-        cache_size_for_batch = len(pareto_tensor)
-        cache_sizes = [cache_size_for_batch for _ in range(len(uids))]
 
         assert all(split == data_splits[0] for split in data_splits), "All elements in data_splits should be the same"
         need_estimate_pareto_front: bool = data_splits[0] != "train"
 
-        for group_uid, indices in uid2indices.items():
-            # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
-            group_scores = score_tensor[indices]  # (group_size, dim)
-            if group_scores.numel() == 0:
-                continue
+        if need_estimate_pareto_front:
+            # update pareto cache
+            pareto_cache_point = score_tensor.mean(dim=0).tolist()
+            print(f"[Amo][HV] pareto_cache_point: {pareto_cache_point}")
+            self.pareto_cache.update(pareto_cache_point)
 
-            # Compute HV contributions against the global Pareto cache.
-            if need_estimate_pareto_front:
-                # set to 0 if need to estimate pareto front, because we don't need contribution
-                # contributions = torch.zeros(len(indices), dtype=torch.float32)
-                reward = 
-            else:
+            # calculate reward through mean of individual scores
+            hybrid_rewards = score_tensor.mean(dim=1)
+        else:
+            # Group indices by uid
+            uid2indices: dict[str, list[int]] = defaultdict(list)
+            for idx, uid in enumerate(uids):
+                uid2indices[uid].append(idx)
+            # print(f"[Amo][HV] uid2indices: {uid2indices}")
+
+            for group_uid, indices in uid2indices.items():
+                # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
+                group_scores = score_tensor[indices]  # (group_size, dim)
+                if group_scores.numel() == 0:
+                    continue
+
+                # Compute HV contributions against the global Pareto cache.
                 contributions = self._compute_hybrid_reward(
                     group_scores, ref_point, pareto_tensor
                 )
@@ -309,27 +310,14 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
                 contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
-            # Write rewards to the last token position and fill extra info
-            for local_idx, global_idx in enumerate(indices):
-                contribution = contributions[local_idx]
-                hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
-                distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
-                # reference_points_per_sample[global_idx] = ref_point.tolist()
-                group_sizes[global_idx] = len(indices)
-
-                valid_response_length = valid_response_lengths[global_idx]
-                if valid_response_length > 0:
-                    reward_tensor[global_idx, valid_response_length - 1] = contributions[local_idx]
-
-            if need_estimate_pareto_front:
-                assert len(group_scores) > 1, "For estimating pareto front, only one sample may cause large estimation error"
-                group_average_score = group_scores.mean(dim=0).tolist()
-                print(f"[Amo][HV] Estimating pareto front for group {group_uid} with average score {group_average_score}")
-                new_pareto_frontier_points.append(group_average_score)
-
-        # update pareto cache
-        if need_estimate_pareto_front and new_pareto_frontier_points:
-            self.pareto_cache.update(new_pareto_frontier_points)
+                # Write rewards to the last token position and fill extra info
+                for local_idx, global_idx in enumerate(indices):
+                    contribution = contributions[local_idx]
+                    
+                    hybrid_rewards[global_idx] = contribution
+                    hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
+                    distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
+                    # reference_points_per_sample[global_idx] = ref_point.tolist()
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -348,16 +336,20 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 # Print individual scores for interpretability
                 for reward_fn_name, score in zip(self.compute_score.keys(), individual_scores_list[i]):
                     print(f"[{reward_fn_name} score]", score)
+                print("[hybrid_rewards]", hybrid_rewards[i].item())
                 print("[hv_contribution]", hv_contributions[i].item())
                 print("[distance_penalty]", distance_penalty[i].item())
-                # print("[total_hv]", total_hv[i].item())
+
+            # Write hybrid rewards to the last token position
+            valid_response_length = valid_response_lengths[i]
+            assert valid_response_length > 0, f"valid_response_lengths[{i}] = {valid_response_length}"
+            reward_tensor[i, valid_response_length - 1] = hybrid_rewards[i]
 
             # Attach HV-related extra information (aligned with sample order)
+            reward_extra_info["hybrid_rewards"].append(hybrid_rewards[i].item())
             reward_extra_info["hv_contribution"].append(hv_contributions[i].item())
             reward_extra_info["distance_penalty"].append(distance_penalty[i].item())
             # reward_extra_info["reference_point"].append(reference_points_per_sample[i])
-            reward_extra_info["group_size"].append(group_sizes[i])
-            reward_extra_info["cache_size"].append(cache_sizes[i])
 
         if return_dict:
             return {
@@ -451,6 +443,9 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         """
         # Take a snapshot of the global Pareto cache for this batch
         pareto_cache_snapshot: list[list[float]] = self.pareto_cache.get_snapshot()
+        print(f"[Amo][HV] Pareto cache snapshot size: {len(pareto_cache_snapshot)}")
+        print(f"[Amo][HV] Pareto cache snapshot: {pareto_cache_snapshot}")
+
         # Prepare Pareto cache tensor for this group (if enabled)
         if len(pareto_cache_snapshot) > 0:
             pareto_tensor = torch.tensor(

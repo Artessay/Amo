@@ -105,6 +105,9 @@ class ParetoCache:
                 self._dim = None
             return
 
+        if isinstance(new_points[0], (float, int)):
+            new_points = [list(new_points)]
+
         # Determine and validate dimensionality.
         first_dim = len(new_points[0])
         for idx, p in enumerate(new_points):
@@ -225,5 +228,14 @@ if __name__ == '__main__':
     snapshot = cache.get_snapshot()
     print(f"   Cache cleared. Size: {len(snapshot)}\n")
     assert len(snapshot) == 0
+
+    print("7. Add a single point:")
+    single_point = [0.5, 0.5]
+    cache.update(single_point)
+    snapshot = cache.get_snapshot()
+    print(f"   Added: {single_point}")
+    print(f"   Pareto front: {snapshot}")
+    print(f"   Size: {len(snapshot)}\n")
+    assert len(snapshot) == 1
     
     print("=== Test Complete ===")
