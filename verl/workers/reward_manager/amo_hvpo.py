@@ -146,6 +146,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         individual_scores_list: list[list[float]] = []
         data_sources: list[str] = []
         uids: list[str] = []
+        data_splits: list[str] = []
         valid_response_lengths: list[int] = []
         prompt_strs: list[str] = []
         response_strs: list[str] = []
@@ -214,6 +215,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # assert uid is not None, "uid should not be None"
 
             uids.append(uid)
+            data_splits.append(split)
             valid_response_lengths.append(valid_response_length)
             prompt_strs.append(prompt_str)
             response_strs.append(response_str)
@@ -230,10 +232,15 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 return reward_tensor
 
         # ------------------------------------------------------------------
-        # Group-wise / global HV computation
+        # HV computation
         # ------------------------------------------------------------------
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
-        dim = score_tensor.shape[1]
+
+        # Determine reference point for this group
+        ref_point = self._compute_reference_point(score_tensor, pareto_tensor)
+
+        # Get Pareto cache snapshot for this batch
+        pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
 
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
@@ -241,63 +248,18 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             uid2indices[uid].append(idx)
 
         hv_contributions = torch.zeros(len(uids), dtype=torch.float32)
-        total_hv = torch.zeros(len(uids), dtype=torch.float32)
-        reference_points_per_sample: list[list[float]] = [
-            [0.0 for _ in range(dim)] for _ in range(len(uids))
-        ]
+        distance_penalty = torch.zeros(len(uids), dtype=torch.float32)
         group_sizes = [0 for _ in range(len(uids))]
-        cache_sizes = [0 for _ in range(len(uids))]
-        group_splits = ["" for _ in range(len(uids))]
 
-        # Take a snapshot of the global Pareto cache for this batch. The snapshot
-        # is read-only while computing rewards so that all samples in the batch
-        # see a consistent frontier.
-        pareto_cache_snapshot: list[list[float]] = []
-        if self.pareto_cache_max_size > 0:
-            pareto_cache_snapshot = self.pareto_cache.get_snapshot()
-        cache_size_for_batch = len(pareto_cache_snapshot)
+        cache_size_for_batch = len(pareto_tensor)
+        cache_sizes = [cache_size_for_batch for _ in range(len(uids))]
+
+        non_dominate_points: List[list[float]] = []
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
             if group_scores.numel() == 0:
                 continue
-
-            # Prepare Pareto cache tensor for this group (if enabled).
-            if len(pareto_cache_snapshot) > 0:
-                pareto_tensor = torch.tensor(
-                    pareto_cache_snapshot,
-                    dtype=group_scores.dtype,
-                    device=group_scores.device,
-                )
-                if pareto_tensor.shape[1] != group_scores.shape[1]:
-                    raise ValueError(
-                        f"[Amo][HV] Pareto cache dimension mismatch: got {pareto_tensor.shape[1]}, expected {group_scores.shape[1]}."
-                    )
-            else:
-                # pareto_tensor is empty, use reference_point as the Pareto front
-                pareto_tensor = group_scores.new_zeros((0, group_scores.shape[1]))
-
-            # Determine reference point for this group
-            group_min = group_scores.min(dim=0).values
-            if self.reference_point_strategy == "dynamic_batch":
-                if pareto_tensor.numel() > 0:
-                    # Use the union of the global Pareto frontier and the current group's
-                    # objective vectors to determine the reference point, then clamp so
-                    # that it is dominated by all group points.
-                    all_points = torch.cat([group_scores, pareto_tensor], dim=0)
-                    union_min = all_points.min(dim=0).values
-                    ref_point = union_min - self.reference_point_margin
-                else:
-                    ref_point = group_min - self.reference_point_margin
-            elif self.reference_point_strategy == "static":
-                ref_point = torch.tensor(self.reference_point, dtype=group_scores.dtype, device=group_scores.device)
-            else:
-                raise ValueError(
-                    f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
-                )
-
-            # Ensure reference point is dominated by all objective vectors in this group
-            ref_point = torch.minimum(ref_point, group_min)
 
             # Compute HV contributions against the global Pareto cache.
             contributions = self._compute_hybrid_reward(
@@ -305,26 +267,28 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             )
             assert contributions.shape == (len(indices),)
 
-            contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
+            # contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
-                hv_contributions[global_idx] = contributions[local_idx]
-                # total_hv[global_idx] = pareto_hv
-                reference_points_per_sample[global_idx] = ref_point.tolist()
+                contribution = contributions[local_idx]
+                hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
+                distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
+                # reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
-                cache_sizes[global_idx] = cache_size_for_batch
+
+                # add points into pareto cache if the contribution is positive and split is not train
+                split = data_splits[global_idx]
+                if split != "train" and contribution > 0:
+                    non_dominate_points.append(group_scores[local_idx].tolist())
 
                 valid_response_length = valid_response_lengths[global_idx]
                 if valid_response_length > 0:
                     reward_tensor[global_idx, valid_response_length - 1] = contributions[local_idx]
 
-        # After computing rewards for the whole batch, update the global
-        # Pareto cache once using all objective vectors from this batch. This
-        # ensures that ΔHV is always measured against the cache state prior to
-        # the current batch.
-        # if is_eval:
-        #     self.pareto_cache.update(individual_scores_list)
+        # update pareto cache
+        if non_dominate_points:
+            self.pareto_cache.update(non_dominate_points)
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -346,13 +310,9 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 print("[hv_contribution]", hv_contributions[i].item())
                 # print("[total_hv]", total_hv[i].item())
 
-        # Attach HV-related extra information (aligned with sample order)
-        for i in range(batch_size):
+            # Attach HV-related extra information (aligned with sample order)
             reward_extra_info["hv_contribution"].append(hv_contributions[i].item())
-            # reward_extra_info["total_hv"].append(total_hv[i].item())
             # reward_extra_info["reference_point"].append(reference_points_per_sample[i])
-            # reward_extra_info["group_uid"].append(uids[i])
-            # reward_extra_info["dim"].append(dim)
             reward_extra_info["group_size"].append(group_sizes[i])
             reward_extra_info["cache_size"].append(cache_sizes[i])
 
@@ -398,6 +358,69 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         return trajectory_rewards
         
+
+    def _compute_reference_point(self, group_scores: torch.Tensor, pareto_tensor: torch.Tensor) -> torch.Tensor:
+        """Compute reference point for hypervolume calculation.
+
+        Args:
+            group_scores: Objective vectors for the group.
+            pareto_tensor: Pareto front vectors.
+
+        Returns:
+            Reference point tensor.
+        """
+        group_min = group_scores.min(dim=0).values
+        if self.reference_point_strategy == "dynamic_batch":
+            if pareto_tensor.numel() > 0:
+                # Use the union of the global Pareto frontier and the current group's
+                # objective vectors to determine the reference point, then clamp so
+                # that it is dominated by all group points.
+                all_points = torch.cat([group_scores, pareto_tensor], dim=0)
+                union_min = all_points.min(dim=0).values
+                ref_point = union_min - self.reference_point_margin
+            else:
+                ref_point = group_min - self.reference_point_margin
+        elif self.reference_point_strategy == "static":
+            ref_point = torch.tensor(self.reference_point, dtype=group_scores.dtype, device=group_scores.device)
+        else:
+            raise ValueError(
+                f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
+            )
+
+        # Ensure reference point is dominated by all objective vectors in this group
+        ref_point = torch.minimum(ref_point, group_min)
+        return ref_point
+
+    def _get_pareto_cache_snapshot(self, score_tensor: torch.Tensor) -> torch.Tensor:
+        """Get a snapshot of the global Pareto cache and convert it to a tensor.
+
+        The snapshot is read-only while computing rewards so that all samples in the batch
+        see a consistent frontier.
+
+        Args:
+            score_tensor: Tensor of objective scores to match dtype and device.
+
+        Returns:
+            Tensor containing the Pareto cache points, or an empty tensor if the cache is empty.
+        """
+        # Take a snapshot of the global Pareto cache for this batch
+        pareto_cache_snapshot: list[list[float]] = self.pareto_cache.get_snapshot()
+        # Prepare Pareto cache tensor for this group (if enabled)
+        if len(pareto_cache_snapshot) > 0:
+            pareto_tensor = torch.tensor(
+                pareto_cache_snapshot,
+                dtype=score_tensor.dtype,
+                device=score_tensor.device,
+            )
+            if pareto_tensor.shape[1] != score_tensor.shape[1]:
+                raise ValueError(
+                    f"[Amo][HV] Pareto cache dimension mismatch: got {pareto_tensor.shape[1]}, expected {score_tensor.shape[1]}."
+                )
+        else:
+            # pareto_tensor is empty, create a zero tensor with the same dtype and device as score_tensor
+            pareto_tensor = score_tensor.new_zeros((0, score_tensor.shape[1]))
+            assert pareto_tensor.numel() == 0, "pareto_tensor should be empty"
+        return pareto_tensor
 
     @staticmethod
     def _scale_contributions(contribs: torch.Tensor, mode: str) -> torch.Tensor:
