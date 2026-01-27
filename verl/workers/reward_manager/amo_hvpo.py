@@ -284,8 +284,10 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         if need_estimate_pareto_front:
             # update pareto cache
             pareto_cache_point = score_tensor.mean(dim=0).tolist()
-            print(f"[Amo][HV] pareto_cache_point: {pareto_cache_point}")
+            print(f"[Amo][HV] Eval Pareto cache snapshot size: {self.pareto_cache.size()}")
+            print(f"[Amo][HV] Eval pareto_cache_point: {pareto_cache_point}")
             self.pareto_cache.update(pareto_cache_point)
+            print(f"[Amo][HV] Added Pareto cache snapshot size: {self.pareto_cache.size()}")
 
             # calculate reward through mean of individual scores
             hybrid_rewards = score_tensor.mean(dim=1)

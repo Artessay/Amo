@@ -1,37 +1,67 @@
-
 import threading
+from typing import ClassVar, Optional
+
 
 class ParetoCache:
-    """Class to manage a global Pareto front cache for multi-objective optimization.
+    """Thread-safe singleton class to manage a global Pareto front cache.
 
     This cache maintains a bounded set of non-dominated points under maximization,
     supporting operations for initialization, updating, querying, and maintenance.
 
-    The cache behavior is controlled via the following parameters:
+    Notes on singleton behavior:
+    - Only one instance of ParetoCache can exist in a process.
+    - The first construction call initializes the singleton's configuration.
+    - Subsequent construction calls return the same instance and ignore new parameters.
+
+    The cache behavior is controlled via:
     - max_size: Maximum number of stored Pareto points
     - eps: Dominance tolerance for approximate Pareto front
     - strategy: Eviction strategy (currently only "fifo")
     """
 
-    def __init__(self, max_size: int, eps: float, strategy: str = "fifo") -> None:
-        """Initialize the Pareto cache.
+    # Singleton storage and construction lock (class-level).
+    _instance: ClassVar[Optional["ParetoCache"]] = None
+    _instance_lock: ClassVar[threading.Lock] = threading.Lock()
 
-        Args:
-            max_size: Maximum number of stored Pareto points
-            eps: Dominance tolerance
-            strategy: Eviction strategy (currently only "fifo" is supported)
+    def __new__(cls, max_size: int, eps: float, strategy: str = "fifo") -> "ParetoCache":
+        """Create or return the singleton instance (thread-safe).
+
+        This uses double-checked locking to avoid unnecessary locking after
+        the singleton is created.
         """
+        if cls._instance is None:
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self, max_size: int, eps: float, strategy: str = "fifo") -> None:
+        """Initialize the singleton instance exactly once.
+
+        Only the first call performs real initialization. Later calls
+        return immediately and do not override existing configuration.
+        """
+        # Guard against re-initialization when __init__ is called multiple times.
+        if getattr(self, "_initialized", False):
+            return
+
         self.max_size = max_size
         self.eps = eps
         self.strategy = strategy
-        
+
         if self.strategy not in {"fifo"}:
             raise ValueError(f"Unsupported pareto_cache_strategy: {self.strategy}")
-        
-        # Internal cache state
+
+        # Internal cache state (instance-level lock for cache operations).
         self._cache: list[list[float]] = []
         self._lock = threading.Lock()
         self._dim: int | None = None
+
+        self._initialized = True
+
+        print(
+            f"[Amo] Pareto cache initialized with max_size={max_size}, eps={eps}, strategy={strategy}"
+        )
 
     @staticmethod
     def _dominates(a: list[float], b: list[float], eps: float) -> bool:
@@ -79,7 +109,7 @@ class ParetoCache:
         """Get a read-only snapshot of the current Pareto cache.
 
         Returns:
-            A copy of the current Pareto cache points
+            A copy of the current Pareto cache points.
         """
         with self._lock:
             return [p[:] for p in self._cache]
@@ -93,16 +123,13 @@ class ParetoCache:
         filtering, keeping the most recent points.
 
         Args:
-            new_points: List of new objective vectors to add to the cache
+            new_points: List of new objective vectors to add to the cache.
         """
-        if not new_points:
-            return
-
         if self.max_size <= 0:
             # Effectively disable the cache while keeping the code paths simple.
-            with self._lock:
-                self._cache = []
-                self._dim = None
+            return
+
+        if not new_points:
             return
 
         if isinstance(new_points[0], (float, int)):
@@ -112,18 +139,24 @@ class ParetoCache:
         first_dim = len(new_points[0])
         for idx, p in enumerate(new_points):
             if len(p) != first_dim:
-                raise ValueError(f"new_points[{idx}] has dimension {len(p)}, expected {first_dim}.")
+                raise ValueError(
+                    f"new_points[{idx}] has dimension {len(p)}, expected {first_dim}."
+                )
 
         with self._lock:
             if self._dim is None:
                 self._dim = first_dim
             elif self._dim != first_dim:
-                raise ValueError(f"Pareto cache dimension {self._dim} does not match new points dimension {first_dim}.")
+                raise ValueError(
+                    f"Pareto cache dimension {self._dim} does not match new points dimension {first_dim}."
+                )
 
             # Sanity-check existing cache.
             for idx, p in enumerate(self._cache):
                 if len(p) != self._dim:
-                    raise ValueError(f"Cached point at index {idx} has dimension {len(p)}, expected {self._dim}.")
+                    raise ValueError(
+                        f"Cached point at index {idx} has dimension {len(p)}, expected {self._dim}."
+                    )
 
             eps = float(self.eps)
 
@@ -151,6 +184,15 @@ class ParetoCache:
 
             self._cache = merged
 
+    def size(self) -> int:
+        """Get the current size of the Pareto cache.
+
+        Returns:
+            Number of points in the Pareto cache.
+        """
+        with self._lock:
+            return len(self._cache)
+
     def clear(self) -> None:
         """Clear the Pareto cache.
 
@@ -161,11 +203,21 @@ class ParetoCache:
             self._dim = None
 
 
-if __name__ == '__main__':
-    cache = ParetoCache(max_size=10, eps=0.01)
-    
+if __name__ == "__main__":
+
     print("=== ParetoCache Usage Example ===\n")
-    
+
+    # The first call initializes the singleton.
+    cache = ParetoCache(max_size=10, eps=0.01)
+
+    # Any subsequent call returns the same instance (parameters are ignored).
+    cache2 = ParetoCache(max_size=999, eps=123.0)
+    assert cache is cache2
+    # Check that the parameters are set correctly
+    assert cache.max_size == 10
+    assert cache.eps == 0.01
+    assert cache.strategy == "fifo"
+
     print("1. Adding initial points:")
     initial_points = [
         [1.0, 2.0],
@@ -178,7 +230,7 @@ if __name__ == '__main__':
     print(f"   Pareto front: {snapshot}")
     print(f"   Size: {len(snapshot)}\n")
     assert len(snapshot) == 3
-    
+
     print("2. Adding dominated points (should not change the front):")
     dominated_points = [
         [0.5, 0.5],
@@ -190,7 +242,7 @@ if __name__ == '__main__':
     print(f"   Pareto front: {snapshot}")
     print(f"   Size: {len(snapshot)}\n")
     assert len(snapshot) == 3
-    
+
     print("3. Adding new non-dominated points:")
     new_nd_points = [
         [2.5, 1.5],
@@ -202,7 +254,7 @@ if __name__ == '__main__':
     print(f"   Pareto front: {snapshot}")
     print(f"   Size: {len(snapshot)}\n")
     assert len(snapshot) == 3
-    
+
     print("4. Adding points that dominate existing ones:")
     dominating_points = [
         [3.0, 3.0],
@@ -213,7 +265,7 @@ if __name__ == '__main__':
     print(f"   Pareto front: {snapshot}")
     print(f"   Size: {len(snapshot)}\n")
     assert len(snapshot) == 1
-    
+
     print("5. Testing FIFO eviction (max_size=10):")
     many_points = [[i, 10 - i] for i in range(0, 10)]
     cache.update(many_points)
@@ -237,5 +289,5 @@ if __name__ == '__main__':
     print(f"   Pareto front: {snapshot}")
     print(f"   Size: {len(snapshot)}\n")
     assert len(snapshot) == 1
-    
+
     print("=== Test Complete ===")
