@@ -148,6 +148,15 @@ class ParetoCache:
 
             self._cache = merged
 
+    def clear(self) -> None:
+        """Clear the Pareto cache.
+
+        This removes all stored points and resets the cache dimension.
+        """
+        with self._lock:
+            self._cache = []
+            self._dim = None
+
 
 if __name__ == '__main__':
     cache = ParetoCache(max_size=10, eps=0.01)
@@ -210,5 +219,11 @@ if __name__ == '__main__':
     print(f"   Pareto front size: {len(snapshot)}")
     print(f"   Pareto front: {snapshot}\n")
     assert len(snapshot) == 10
+
+    print("6. Clearing the cache:")
+    cache.clear()
+    snapshot = cache.get_snapshot()
+    print(f"   Cache cleared. Size: {len(snapshot)}\n")
+    assert len(snapshot) == 0
     
     print("=== Test Complete ===")

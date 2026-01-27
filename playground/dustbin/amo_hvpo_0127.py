@@ -97,8 +97,13 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Reward post-processing
         self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
+
+        # Global Pareto front cache configuration
+        self.use_global_pareto_cache: bool = bool(
+            hv_config.get("use_global_pareto_cache", True)
+        )
         
-        # Create ParetoCache instance
+        # Create ParetoCache instance if global cache is enabled
         self.pareto_cache_max_size: int = int(hv_config.get("pareto_cache_max_size", 1024))
         self.pareto_cache_eps: float = float(hv_config.get("pareto_cache_eps", 1e-9))
         self.pareto_cache_strategy: str = hv_config.get("pareto_cache_strategy", "fifo")
@@ -191,19 +196,20 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             individual_scores_list.append([float(s) for s in individual_scores])
             data_sources.append(data_source)
 
-            # Try to generate a stable uid from extra_info first
-            extra_info = data_item.non_tensor_batch.get("extra_info", {})
-            # Use split and index to generate stable uid for the same prompt
-            split = extra_info.get("split", "default")
-            # Try to get index from extra_info, which should be the same for all responses from the same prompt
-            index = extra_info.get("index")
-            assert index is not None, ""
-            # Generate a stable uid based on split and index
-            uid = f"{split}_{index}"
-            
-            # # Use uid from non_tensor_batch 
-            # uid = data_item.non_tensor_batch.get("uid")
-            # assert uid is not None, "uid should not be None"
+            if self.use_global_pareto_cache:
+                # Try to generate a stable uid from extra_info first
+                extra_info = data_item.non_tensor_batch.get("extra_info", {})
+                # Use split and index to generate stable uid for the same prompt
+                split = extra_info.get("split", "default")
+                # Try to get index from extra_info, which should be the same for all responses from the same prompt
+                index = extra_info.get("index")
+                assert index is not None, ""
+                # Generate a stable uid based on split and index
+                uid = f"{split}_{index}"
+            else:
+                # Use uid from non_tensor_batch 
+                uid = data_item.non_tensor_batch.get("uid")
+                assert uid is not None, "uid should not be None"
 
             uids.append(uid)
             valid_response_lengths.append(valid_response_length)
@@ -252,14 +258,16 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         ]
         group_sizes = [0 for _ in range(len(uids))]
         cache_sizes = [0 for _ in range(len(uids))]
+        used_global_cache_flags = [False for _ in range(len(uids))]
 
         # Take a snapshot of the global Pareto cache for this batch. The snapshot
         # is read-only while computing rewards so that all samples in the batch
         # see a consistent frontier.
         pareto_cache_snapshot: list[list[float]] = []
-        if self.pareto_cache_max_size > 0:
+        if self.use_global_pareto_cache and self.pareto_cache_max_size > 0:
             pareto_cache_snapshot = self.pareto_cache.get_snapshot()
-        cache_size_for_batch = len(pareto_cache_snapshot)
+        use_global_cache_for_batch = bool(self.use_global_pareto_cache and self.pareto_cache_max_size > 0)
+        cache_size_for_batch = len(pareto_cache_snapshot) if use_global_cache_for_batch else 0
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
@@ -267,7 +275,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 continue
 
             # Prepare Pareto cache tensor for this group (if enabled).
-            if len(pareto_cache_snapshot) > 0:
+            if use_global_cache_for_batch and pareto_cache_snapshot:
                 pareto_tensor = torch.tensor(
                     pareto_cache_snapshot,
                     dtype=group_scores.dtype,
@@ -278,7 +286,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                         f"[Amo][HV] Pareto cache dimension mismatch: got {pareto_tensor.shape[1]}, expected {group_scores.shape[1]}."
                     )
             else:
-                # pareto_tensor is empty, use reference_point as the Pareto front
                 pareto_tensor = group_scores.new_zeros((0, group_scores.shape[1]))
 
             # Determine reference point for this group
@@ -304,10 +311,13 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Ensure reference point is dominated by all objective vectors in this group
             ref_point = torch.minimum(ref_point, group_min)
 
-            # Compute HV contributions against the global Pareto cache.
-            pareto_hv, contributions = self._compute_global_hv_contributions(
-                group_scores, ref_point, pareto_tensor
-            )
+            # Compute HV contributions: either group-wise or against the global Pareto cache.
+            if use_global_cache_for_batch:
+                pareto_hv, contributions = self._compute_global_hv_contributions(
+                    group_scores, ref_point, pareto_tensor
+                )
+            else:
+                group_hv, contributions = self._compute_group_hv(group_scores, ref_point)
             assert contributions.shape == (len(indices),)
 
             # Post-process contributions
@@ -319,10 +329,11 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
                 hv_contributions[global_idx] = contributions[local_idx]
-                total_hv[global_idx] = pareto_hv
+                total_hv[global_idx] = pareto_hv if use_global_cache_for_batch else group_hv
                 reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
                 cache_sizes[global_idx] = cache_size_for_batch
+                used_global_cache_flags[global_idx] = use_global_cache_for_batch
 
                 valid_response_length = valid_response_lengths[global_idx]
                 if valid_response_length > 0:
@@ -332,8 +343,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Pareto cache once using all objective vectors from this batch. This
         # ensures that ΔHV is always measured against the cache state prior to
         # the current batch.
-        # if is_eval:
-        #     self.pareto_cache.update(individual_scores_list)
+        if use_global_cache_for_batch:
+            self.pareto_cache.update(individual_scores_list)
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -364,6 +375,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # reward_extra_info["dim"].append(dim)
             reward_extra_info["group_size"].append(group_sizes[i])
             reward_extra_info["cache_size"].append(cache_sizes[i])
+            # reward_extra_info["used_global_cache"].append(bool(used_global_cache_flags[i]))
 
         if return_dict:
             return {
