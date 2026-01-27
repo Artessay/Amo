@@ -24,19 +24,19 @@ class HypervolumeCalculator:
     for multi-objective optimization problems.
     """
 
-    def calculate_hypervolume_with_tensor(
+    def calculate_hypervolume(
         self,
         points: torch.Tensor,
         ref_point: torch.Tensor,
     ) -> torch.Tensor:
         """Compute hypervolume using recursive slicing algorithm."""
-        hv: float = self.calculate_hypervolume(
+        hv: float = self._calculate_hypervolume(
             points.tolist(),
             ref_point.tolist(),
         )
-        return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device).clamp(min=0.0)
+        return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device)
 
-    def calculate_hypervolume(
+    def _calculate_hypervolume(
         self,
         points: List[tuple],
         ref_point: tuple,
@@ -50,7 +50,11 @@ class HypervolumeCalculator:
         Returns:
             Hypervolume value.
         """
-        return self._recursive_slicing_algorithm(points, ref_point)
+
+        hv = self._recursive_slicing_algorithm(points, ref_point)
+        assert hv >= 0.0, "Hypervolume must be non-negative"
+
+        return hv
 
     def _recursive_slicing_algorithm(
         self,
@@ -88,7 +92,6 @@ class HypervolumeCalculator:
         return hv
 
 if __name__ == "__main__":
-    import math
     hv_calculator = HypervolumeCalculator()
 
     print("=== Test Hypervolume Calculator ===")
@@ -96,9 +99,9 @@ if __name__ == "__main__":
     # Pareto Frontier are surounded by (3, 4), (4, 3)
     points = [(1, 2), (2, 1), (3, 4), (4, 3)]
     ref_point = (0, 0)
-    hv = hv_calculator.calculate_hypervolume(points, ref_point)
+    hv = hv_calculator._calculate_hypervolume(points, ref_point)
     print(f"Hypervolume: {hv}")
-    assert math.isclose(hv, 15.0)
+    assert hv == 15.0
     
     print("=== Test Complete ===")
 

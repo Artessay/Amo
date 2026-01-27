@@ -91,12 +91,17 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Margin to subtract from min objective values when using dynamic reference points
         self.reference_point_margin: float = float(hv_config.get("reference_point_margin", 0.0))
 
-        if self.reference_point_strategy == "static" and self.reference_point is None:
-            self.reference_point = [0] * len(self.compute_score)
-            print(f"[Amo][HV] reference_point is set to {self.reference_point}")
+        if self.reference_point_strategy == "static":
+            if self.reference_point is None:
+                self.reference_point = [0] * len(self.compute_score)
+                print(f"[Amo][HV] reference_point is set to {self.reference_point}")
+            elif len(self.reference_point) != len(self.compute_score):
+                raise ValueError(
+                    f"[Amo][HV] reference_point length {len(self.reference_point)} "
+                    f"does not match compute_score dimension {len(self.compute_score)}."
+                )
 
         # Reward post-processing
-        self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
 
         self.hypervolume_calculator = HypervolumeCalculator()
@@ -232,19 +237,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
         dim = score_tensor.shape[1]
 
-        # Prepare static reference point if configured
-        static_ref_point: torch.Tensor | None = None
-        if self.reference_point_strategy == "static":
-            if self.reference_point is None:
-                raise ValueError(
-                    "[Amo][HV] reference_point_strategy is 'static' but 'reference_point' is not provided."
-                )
-            static_ref_point = torch.tensor(self.reference_point, dtype=torch.float32)
-            if static_ref_point.numel() != dim:
-                raise ValueError(
-                    f"[Amo][HV] reference_point dimension mismatch: got {static_ref_point.numel()}, expected {dim}."
-                )
-
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
         for idx, uid in enumerate(uids):
@@ -257,6 +249,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         ]
         group_sizes = [0 for _ in range(len(uids))]
         cache_sizes = [0 for _ in range(len(uids))]
+        group_splits = ["" for _ in range(len(uids))]
 
         # Take a snapshot of the global Pareto cache for this batch. The snapshot
         # is read-only while computing rewards so that all samples in the batch
@@ -289,7 +282,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Determine reference point for this group
             group_min = group_scores.min(dim=0).values
             if self.reference_point_strategy == "dynamic_batch":
-                if use_global_cache_for_batch and pareto_tensor.numel() > 0:
+                if pareto_tensor.numel() > 0:
                     # Use the union of the global Pareto frontier and the current group's
                     # objective vectors to determine the reference point, then clamp so
                     # that it is dominated by all group points.
@@ -299,8 +292,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 else:
                     ref_point = group_min - self.reference_point_margin
             elif self.reference_point_strategy == "static":
-                assert static_ref_point is not None
-                ref_point = static_ref_point.to(dtype=group_scores.dtype, device=group_scores.device)
+                ref_point = torch.tensor(self.reference_point, dtype=group_scores.dtype, device=group_scores.device)
             else:
                 raise ValueError(
                     f"[Amo][HV] Unsupported reference_point_strategy: {self.reference_point_strategy}"
@@ -310,21 +302,17 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             ref_point = torch.minimum(ref_point, group_min)
 
             # Compute HV contributions against the global Pareto cache.
-            pareto_hv, contributions = self._compute_global_hv_contributions(
+            contributions = self._compute_global_hv_contributions(
                 group_scores, ref_point, pareto_tensor
             )
             assert contributions.shape == (len(indices),)
-
-            # Post-process contributions
-            if self.clip_negative:
-                contributions = torch.clamp(contributions, min=0.0)
 
             contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
                 hv_contributions[global_idx] = contributions[local_idx]
-                total_hv[global_idx] = pareto_hv
+                # total_hv[global_idx] = pareto_hv
                 reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
                 cache_sizes[global_idx] = cache_size_for_batch
@@ -358,12 +346,12 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 for reward_fn_name, score in zip(self.compute_score.keys(), individual_scores_list[i]):
                     print(f"[{reward_fn_name} score]", score)
                 print("[hv_contribution]", hv_contributions[i].item())
-                print("[total_hv]", total_hv[i].item())
+                # print("[total_hv]", total_hv[i].item())
 
         # Attach HV-related extra information (aligned with sample order)
         for i in range(batch_size):
             reward_extra_info["hv_contribution"].append(hv_contributions[i].item())
-            reward_extra_info["total_hv"].append(total_hv[i].item())
+            # reward_extra_info["total_hv"].append(total_hv[i].item())
             # reward_extra_info["reference_point"].append(reference_points_per_sample[i])
             # reward_extra_info["group_uid"].append(uids[i])
             # reward_extra_info["dim"].append(dim)
@@ -381,28 +369,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
     # ------------------------------------------------------------------
     # Helper methods
     # ------------------------------------------------------------------    @staticmethod
-    def _normalize_vectors_for_hv(
-        vectors: torch.Tensor,
-        ref_point: torch.Tensor,
-    ) -> torch.Tensor:
-        """Optionally normalize objective vectors for HV.
-
-        This is kept for extensibility, but disabled by default because changing
-        the geometry of the dominated region will alter HV values in ways that
-        may be undesirable. When enabled, we perform a simple per-dimension
-        min-max normalization within the group.
-        """
-        if vectors.numel() == 0:
-            return vectors
-
-        v_min = vectors.min(dim=0).values
-        v_max = vectors.max(dim=0).values
-        range_ = torch.clamp(v_max - v_min, min=1e-8)
-        normalized = (vectors - v_min) / range_
-
-        # Adjust reference point to the same scale if needed
-        # (assumes ref_point <= v_min component-wise)
-        return normalized
 
     @staticmethod
     def _scale_contributions(contribs: torch.Tensor, mode: str) -> torch.Tensor:
@@ -433,76 +399,31 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         raise ValueError(f"[Amo][HV] Unsupported reward_scaling_mode: {mode}")
 
-    @staticmethod
-    def _remove_index(vectors: torch.Tensor, index: int) -> torch.Tensor:
-        """Create a new tensor with the row at ``index`` removed."""
-        if vectors.shape[0] <= 1:
-            return vectors.new_zeros((0, vectors.shape[1]))
-        return torch.cat([vectors[:index], vectors[index + 1 :]], dim=0)
 
-    def _compute_group_hv(
+    def _compute_hv_contribution_to_pareto(
         self,
-        vectors: torch.Tensor,
-        ref_point: torch.Tensor,
+        point: torch.Tensor,  # (dim,)
+        pareto_vectors: torch.Tensor,   # (K, dim)
+        ref_point: torch.Tensor,     # (dim,)
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute group HV and HV without each point.
-
-        Args:
-            vectors: Tensor of shape (group_size, dim).
-            ref_point: Reference point tensor of shape (dim,).
-
-        Returns:
-            A tuple ``(hv_total, hv_without_each)`` where:
-            - hv_total: scalar tensor, HV(S, ref_point).
-            - hv_without_each: tensor of shape (group_size,), where the i-th
-              element is HV(S - {i}, ref_point).
-        """
-        group_size, dim = vectors.shape
-
-        if group_size == 0 or dim == 0:
-            return vectors.new_tensor(0.0), vectors.new_zeros(group_size)
-
-        hv_total = self._hv_recursive_slicing(vectors, ref_point)
-        hv_without_each = []
-        for i in range(group_size):
-            sub = self._remove_index(vectors, i)
-            hv_without_each.append(self._hv_recursive_slicing(sub, ref_point))
-
-        hv_without_each_tensor = torch.stack(hv_without_each) if hv_without_each else vectors.new_zeros(0)
-        contributions = hv_total - hv_without_each  # (group_size,)
-        return hv_total, contributions
-
-    def _compute_global_hv_contributions(
-        self,
-        group_vectors: torch.Tensor,
-        ref_point: torch.Tensor,
-        pareto_vectors: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute HV(P ∪ {v_i}, r) - HV(P, r) for each ``v_i`` in a group.
+        """Compute HV(P ∪ {v_i}, r) - HV(P, r) for point ``v_i``.
 
         This method is used when the global Pareto cache is enabled. The
         ``pareto_vectors`` tensor is a snapshot of the global Pareto front for
         this batch and is *not* modified inside this method.
 
         Args:
-            group_vectors: Tensor of shape (group_size, dim) with group scores.
+            point: Tensor of shape (dim,) with the point to evaluate.
             ref_point: Reference point tensor of shape (dim,).
             pareto_vectors: Tensor of shape (K, dim) with cached Pareto points.
 
         Returns:
-            A tuple ``(hv_pareto, contribs)`` where:
-            - hv_pareto: scalar tensor, ``HV(P, ref_point)``.
-            - contribs: tensor of shape (group_size,), where the i-th element is
-              ``HV(P ∪ {v_i}, ref_point) - HV(P, ref_point)``.
+            
         """
-        group_size, dim = group_vectors.shape
-        if group_size == 0 or dim == 0:
-            return group_vectors.new_tensor(0.0), group_vectors.new_zeros(group_size)
-
         if pareto_vectors.numel() == 0:
-            hv_pareto = group_vectors.new_tensor(0.0)
+            hv_pareto = point.new_tensor(0.0)
         else:
-            hv_pareto = self._hv_recursive_slicing(pareto_vectors, ref_point)
+            hv_pareto = self.hypervolume_calculator.calculate_hypervolume(pareto_vectors, ref_point)
 
         contribs = group_vectors.new_zeros(group_size, dtype=torch.float32)
         for i in range(group_size):
@@ -516,52 +437,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         return hv_pareto.to(torch.float32), contribs
 
-    def _hv_recursive_slicing(
-        self,
-        points: torch.Tensor,
-        ref_point: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute hypervolume using recursive slicing algorithm."""
-        hv: float = self._hv_recursive_slicing_helper(
-            points.tolist(),
-            ref_point.tolist(),
-        )
-        return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device).clamp(min=0.0)
-
-    def _hv_recursive_slicing_helper(
-        self,
-        points: List[tuple],
-        ref_point: tuple,
-    ) -> float:
-        """Recursive slicing algorithm (list-based implementation).
-
-        Adapted from Fonseca et al. (2006).
-        """
-        if not points:
-            return 0.0
-
-        # 1-D case
-        if len(ref_point) == 1:
-            return max(p[0] for p in points) - ref_point[0]
-
-        points = sorted(points, key=lambda p: p[0])
-
-        hv = 0.0
-        ref0 = ref_point[0]  # moving slice position
-        while points:
-            # Current slice: width along dim-0
-            p0 = points[0]
-            width = p0[0] - ref0
-            if width > 0:
-                # All points in this slice, projected to the remaining m-1 dims
-                slice_pts = [p[1:] for p in points]
-                slice_ref = ref_point[1:]
-                hv += width * self._hv_recursive_slicing_helper(slice_pts, slice_ref)
-                ref0 = p0[0]
-            # Keep only points strictly beyond the present slice
-            points = [p for p in points if p[0] > p0[0]]
-
-        return hv
 
     def _compute_distance_to_pareto(
         self,
@@ -586,60 +461,20 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         
         # Find the Pareto point that is easiest to reach
         min_distance = max_gaps.min()
+        assert min_distance >= 0.0 # all distance should be non-negative
         
-        return min_distance.clamp(min=0.0)
+        return min_distance
 
 
     def _compute_hybrid_reward(
         self,
-        delta_hv: float,
-        distance: float,
-        alpha: float = 0.1,  # Distance reward weight
+        group_vectors: torch.Tensor,
+        ref_point: torch.Tensor,
+        pareto_vectors: torch.Tensor,
     ) -> float:
-        """Hybrid reward: ΔHV + distance reward"""
+        """Hybrid reward: ΔHV or distance penalty"""
         if delta_hv > 0:
             return delta_hv
         else:
             # For dominated points, use negative distance as reward (smaller distance = higher reward)
             return -alpha * distance
-
-    def _compute_hybrid_hv_reward(
-        self,
-        point: torch.Tensor,
-        pareto_vectors: torch.Tensor,
-        ref_point: torch.Tensor,
-        config: dict,
-    ) -> float:
-        """Robust hypervolume reward calculation."""
-        
-        # 1. Calculate original ΔHV
-        delta_hv = self._compute_delta_hv(point, pareto_vectors, ref_point)
-        
-        if delta_hv > config.get("hv_threshold", 1e-9):
-            # Has positive contribution, return directly
-            return delta_hv
-        
-        # 2. Fallback strategy when ΔHV = 0
-        fallback_strategy = config.get("fallback_strategy", "distance")
-        
-        if fallback_strategy == "distance":
-            # Use distance to the front
-            distance = self._compute_distance_to_pareto(point, pareto_vectors)
-            max_distance = config.get("max_distance", 1.0)
-            return config.get("distance_weight", 0.1) * (1 - distance / max_distance).clamp(0, 1)
-        
-        elif fallback_strategy == "epsilon":
-            # Use ε-dominance
-            epsilon = config.get("epsilon", 0.05)
-            return self._compute_epsilon_hv_contribution(
-                point, pareto_vectors, ref_point, epsilon
-            )
-        
-        elif fallback_strategy == "local":
-            # Use local Pareto front
-            local_pareto = self._build_local_pareto_front(
-                point, pareto_vectors, k=config.get("local_k", 50)
-            )
-            return self._compute_delta_hv(point, local_pareto, ref_point)
-        
-        return 0.0
