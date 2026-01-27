@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Tuple
+from typing import List
 
 import torch
 
@@ -24,20 +24,22 @@ class HypervolumeCalculator:
     for multi-objective optimization problems.
     """
 
+    @classmethod
     def calculate_hypervolume(
-        self,
+        cls,
         points: torch.Tensor,
         ref_point: torch.Tensor,
     ) -> torch.Tensor:
         """Compute hypervolume using recursive slicing algorithm."""
-        hv: float = self._calculate_hypervolume(
+        hv: float = cls._calculate_hypervolume(
             points.tolist(),
             ref_point.tolist(),
         )
         return torch.tensor(hv, dtype=ref_point.dtype, device=ref_point.device)
 
+    @classmethod
     def _calculate_hypervolume(
-        self,
+        cls,
         points: List[tuple],
         ref_point: tuple,
     ) -> float:
@@ -51,13 +53,14 @@ class HypervolumeCalculator:
             Hypervolume value.
         """
 
-        hv = self._recursive_slicing_algorithm(points, ref_point)
+        hv = cls._recursive_slicing_algorithm(points, ref_point)
         assert hv >= 0.0, "Hypervolume must be non-negative"
 
         return hv
 
+    @classmethod
     def _recursive_slicing_algorithm(
-        self,
+        cls,
         points: List[tuple],
         ref_point: tuple,
     ) -> float:
@@ -84,7 +87,7 @@ class HypervolumeCalculator:
                 # All points in this slice, projected to the remaining m-1 dims
                 slice_pts = [p[1:] for p in points]
                 slice_ref = ref_point[1:]
-                hv += width * self._recursive_slicing_algorithm(slice_pts, slice_ref)
+                hv += width * cls._recursive_slicing_algorithm(slice_pts, slice_ref)
                 ref0 = p0[0]
             # Keep only points strictly beyond the present slice
             points = [p for p in points if p[0] > p0[0]]
@@ -92,14 +95,12 @@ class HypervolumeCalculator:
         return hv
 
 if __name__ == "__main__":
-    hv_calculator = HypervolumeCalculator()
-
     print("=== Test Hypervolume Calculator ===")
 
     # Pareto Frontier are surounded by (3, 4), (4, 3)
     points = [(1, 2), (2, 1), (3, 4), (4, 3)]
     ref_point = (0, 0)
-    hv = hv_calculator._calculate_hypervolume(points, ref_point)
+    hv = HypervolumeCalculator._calculate_hypervolume(points, ref_point)
     print(f"Hypervolume: {hv}")
     assert hv == 15.0
     

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from collections import defaultdict
-from typing import Any, List
+from typing import Any
 
 import asyncio
 import torch
@@ -23,7 +23,7 @@ from verl.workers.reward_manager import register
 from verl.workers.reward_manager.amo_vanilla import AmoVanillaRewardManager
 
 from verl.workers.reward_manager.amo_utils.pareto_cache import ParetoCache
-from verl.workers.reward_manager.amo_utils.hypervolume_calculator import HypervolumeCalculator
+from verl.workers.reward_manager.amo_utils.hybrid_reward import HybridRewardModel
 
 @register("amo_hvpo")
 class AmoHvpoRewardManager(AmoVanillaRewardManager):
@@ -103,8 +103,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         # Reward post-processing
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
-
-        self.hypervolume_calculator = HypervolumeCalculator()
         
         # Create ParetoCache instance
         self.pareto_cache_max_size: int = int(hv_config.get("pareto_cache_max_size", 1024))
@@ -302,7 +300,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             ref_point = torch.minimum(ref_point, group_min)
 
             # Compute HV contributions against the global Pareto cache.
-            contributions = self._compute_global_hv_contributions(
+            contributions = self._compute_hybrid_reward(
                 group_scores, ref_point, pareto_tensor
             )
             assert contributions.shape == (len(indices),)
@@ -369,6 +367,37 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
     # ------------------------------------------------------------------
     # Helper methods
     # ------------------------------------------------------------------    @staticmethod
+    @staticmethod
+    def _compute_hybrid_reward(
+        group_vectors: torch.Tensor,
+        ref_point: torch.Tensor,
+        pareto_vectors: torch.Tensor,
+    ) -> torch.Tensor:
+        """Hybrid reward: ΔHV or distance penalty for a batch points.
+        The calculation for a single point is given by HybridRewardModel
+        
+        Args:
+            group_vectors: Objective vectors for the group.
+            ref_point: Reference point for hypervolume calculation.
+            pareto_vectors: Pareto front vectors.
+        
+        Returns:
+            Hybrid reward tensor for each point.
+        """
+        group_size, dim = group_vectors.shape
+
+        # Compute hybrid reward for each point in the group
+        rewards = []
+        for point in group_vectors:
+            reward = HybridRewardModel.compute_hybrid_reward(point, pareto_vectors, ref_point)
+            rewards.append(reward)
+        
+        # Return tensor with rewards for each point
+        trajectory_rewards = torch.stack(rewards)
+        assert trajectory_rewards.shape == (group_size,), f"[Amo][HV] Hybrid reward shape mismatch: {trajectory_rewards.shape}"
+
+        return trajectory_rewards
+        
 
     @staticmethod
     def _scale_contributions(contribs: torch.Tensor, mode: str) -> torch.Tensor:
@@ -398,83 +427,3 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             return 0.5 + 1.5 * torch.tanh(contribs)
 
         raise ValueError(f"[Amo][HV] Unsupported reward_scaling_mode: {mode}")
-
-
-    def _compute_hv_contribution_to_pareto(
-        self,
-        point: torch.Tensor,  # (dim,)
-        pareto_vectors: torch.Tensor,   # (K, dim)
-        ref_point: torch.Tensor,     # (dim,)
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute HV(P ∪ {v_i}, r) - HV(P, r) for point ``v_i``.
-
-        This method is used when the global Pareto cache is enabled. The
-        ``pareto_vectors`` tensor is a snapshot of the global Pareto front for
-        this batch and is *not* modified inside this method.
-
-        Args:
-            point: Tensor of shape (dim,) with the point to evaluate.
-            ref_point: Reference point tensor of shape (dim,).
-            pareto_vectors: Tensor of shape (K, dim) with cached Pareto points.
-
-        Returns:
-            
-        """
-        if pareto_vectors.numel() == 0:
-            hv_pareto = point.new_tensor(0.0)
-        else:
-            hv_pareto = self.hypervolume_calculator.calculate_hypervolume(pareto_vectors, ref_point)
-
-        contribs = group_vectors.new_zeros(group_size, dtype=torch.float32)
-        for i in range(group_size):
-            vi = group_vectors[i : i + 1]
-            if pareto_vectors.numel() == 0:
-                union_points = vi
-            else:
-                union_points = torch.cat([pareto_vectors, vi], dim=0)
-            hv_with_i = self._hv_recursive_slicing(union_points, ref_point)
-            contribs[i] = (hv_with_i - hv_pareto).to(torch.float32)
-
-        return hv_pareto.to(torch.float32), contribs
-
-
-    def _compute_distance_to_pareto(
-        self,
-        point: torch.Tensor,  # (dim,)
-        pareto_vectors: torch.Tensor,  # (K, dim)
-    ) -> torch.Tensor:
-        """Compute the "improvement distance" from a point to the Pareto front.
-        
-        For dominated points, returns the amount of improvement needed to reach the front.
-        Smaller return values indicate proximity to the front (better performance).
-        """
-        if pareto_vectors.numel() == 0:
-            return torch.tensor(0.0, device=point.device)
-        
-        # Calculate the "dominance distance" to each Pareto point
-        # For each dimension, calculate the amount of improvement needed (negative values mean already better)
-        gaps = pareto_vectors - point.unsqueeze(0)  # (K, dim)
-        
-        # Use minimum positive distance (find the easiest point to catch up to)
-        # For each Pareto point, calculate the maximum dimension that needs improvement
-        max_gaps = gaps.max(dim=1).values  # (K,)
-        
-        # Find the Pareto point that is easiest to reach
-        min_distance = max_gaps.min()
-        assert min_distance >= 0.0 # all distance should be non-negative
-        
-        return min_distance
-
-
-    def _compute_hybrid_reward(
-        self,
-        group_vectors: torch.Tensor,
-        ref_point: torch.Tensor,
-        pareto_vectors: torch.Tensor,
-    ) -> float:
-        """Hybrid reward: ΔHV or distance penalty"""
-        if delta_hv > 0:
-            return delta_hv
-        else:
-            # For dominated points, use negative distance as reward (smaller distance = higher reward)
-            return -alpha * distance
