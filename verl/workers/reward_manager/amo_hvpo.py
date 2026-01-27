@@ -23,6 +23,7 @@ from verl.workers.reward_manager import register
 from verl.workers.reward_manager.amo_vanilla import AmoVanillaRewardManager
 
 from verl.workers.reward_manager.amo_utils.pareto_cache import ParetoCache
+from verl.workers.reward_manager.amo_utils.hypervolume_calculator import HypervolumeCalculator
 
 @register("amo_hvpo")
 class AmoHvpoRewardManager(AmoVanillaRewardManager):
@@ -97,6 +98,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Reward post-processing
         self.clip_negative: bool = bool(hv_config.get("clip_negative", True))
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
+
+        self.hypervolume_calculator = HypervolumeCalculator()
         
         # Create ParetoCache instance
         self.pareto_cache_max_size: int = int(hv_config.get("pareto_cache_max_size", 1024))
@@ -194,10 +197,12 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Try to generate a stable uid from extra_info first
             extra_info = data_item.non_tensor_batch.get("extra_info", {})
             # Use split and index to generate stable uid for the same prompt
-            split = extra_info.get("split", "default")
+            split = extra_info.get("split")
+            assert split in ["train", "val", "test"], f"split should be 'train', 'val', or 'test', but got {split}"
+
             # Try to get index from extra_info, which should be the same for all responses from the same prompt
             index = extra_info.get("index")
-            assert index is not None, ""
+            assert index is not None, "index should not be None"
             # Generate a stable uid based on split and index
             uid = f"{split}_{index}"
             
@@ -375,8 +380,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
     # ------------------------------------------------------------------
     # Helper methods
-    # ------------------------------------------------------------------
-    @staticmethod
+    # ------------------------------------------------------------------    @staticmethod
     def _normalize_vectors_for_hv(
         vectors: torch.Tensor,
         ref_point: torch.Tensor,

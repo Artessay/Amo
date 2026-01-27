@@ -98,7 +98,7 @@ def main():
     os.makedirs(args.local_dir, exist_ok=True)
 
     process_and_save(train_dataset, "train", "train.parquet")
-    process_and_save(val_dataset, "validation", "val.parquet")
+    process_and_save(val_dataset, "val", "val.parquet")
     process_and_save(test_dataset, "test", "test.parquet")
 
 
