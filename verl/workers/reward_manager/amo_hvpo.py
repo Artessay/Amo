@@ -81,41 +81,73 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         hv_config = dict(hv_config) if hv_config is not None else {}
         self.hv_config: dict[str, Any] = hv_config
 
+        print(f"[Amo][HV] Using HV reward manager with hv_config: {self.hv_config}")
+
+        # config
+        self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
+        self.distance_metric: str = hv_config.get("distance_metric", "chebyshev")
+
+        self._configure_reference_point()
+        self._configure_pareto_cache()
+        
+
+    # ------------------------------------------------------------------
+    # Init methods
+    # ------------------------------------------------------------------
+    def _configure_reference_point(self) -> None:
+        """Configure reference point based on the selected strategy.
+
+        Args:
+            hv_config: Configuration dict for HV-based reward shaping.
+        """
+        hv_config: dict = self.hv_config
+
         # Reference point configuration
         self.reference_point_strategy: str = hv_config.get(
             "reference_point_strategy", "static"    # "dynamic_batch" or "static"
         )
 
-        # Only used when strategy == "static"
-        self.reference_point = hv_config.get("reference_point", None)
-        # Margin to subtract from min objective values when using dynamic reference points
-        self.reference_point_margin: float = float(hv_config.get("reference_point_margin", 0.0))
-
         if self.reference_point_strategy == "static":
+            self.reference_point = hv_config.get("reference_point", None)
             if self.reference_point is None:
                 self.reference_point = [0] * len(self.compute_score)
                 print(f"[Amo][HV] reference_point is set to {self.reference_point}")
-            elif len(self.reference_point) != len(self.compute_score):
+            
+            # check reference_point length
+            if len(self.reference_point) != len(self.compute_score):
+                print(f"[Amo][HV] reference_point: {self.reference_point}")
                 raise ValueError(
                     f"[Amo][HV] reference_point length {len(self.reference_point)} "
                     f"does not match compute_score dimension {len(self.compute_score)}."
                 )
+        elif self.reference_point_strategy == "dynamic_batch":
+            # Margin to subtract from min objective values when using dynamic reference points
+            self.reference_point_margin: float = float(hv_config.get("reference_point_margin", 0.0))
+        else:
+            raise ValueError(
+                f"[Amo][HV] reference_point_strategy {self.reference_point_strategy} "
+                "is not supported. Please choose 'static' or 'dynamic_batch'."
+            )
 
-        # Reward post-processing
-        self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
-        
-        # Create ParetoCache instance
+    def _configure_pareto_cache(self) -> None:
+        """Configure Pareto cache based on the selected strategy.
+
+        Args:
+            hv_config: Configuration dict for HV-based reward shaping.
+        """
+        hv_config: dict = self.hv_config
+
+        # Pareto cache configuration
         self.pareto_cache_max_size: int = int(hv_config.get("pareto_cache_max_size", 1024))
         self.pareto_cache_eps: float = float(hv_config.get("pareto_cache_eps", 1e-9))
         self.pareto_cache_strategy: str = hv_config.get("pareto_cache_strategy", "fifo")
         
+        # Create ParetoCache instance
         self.pareto_cache = ParetoCache(
             max_size=self.pareto_cache_max_size,
             eps=self.pareto_cache_eps,
             strategy=self.pareto_cache_strategy
         )
-
-        print(f"[Amo][HV] Using HV reward manager with hv_config: {self.hv_config}")
 
     # ------------------------------------------------------------------
     # Public API
@@ -236,16 +268,17 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # ------------------------------------------------------------------
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)
 
-        # Determine reference point for this group
-        ref_point = self._compute_reference_point(score_tensor, pareto_tensor)
-
         # Get Pareto cache snapshot for this batch
         pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
+
+        # Determine reference point for this group
+        ref_point = self._compute_reference_point(score_tensor, pareto_tensor)
 
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
         for idx, uid in enumerate(uids):
             uid2indices[uid].append(idx)
+        print(f"[Amo][HV] uid2indices: {uid2indices}")
 
         hv_contributions = torch.zeros(len(uids), dtype=torch.float32)
         distance_penalty = torch.zeros(len(uids), dtype=torch.float32)
@@ -254,7 +287,9 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         cache_size_for_batch = len(pareto_tensor)
         cache_sizes = [cache_size_for_batch for _ in range(len(uids))]
 
-        non_dominate_points: List[list[float]] = []
+        assert all(split == data_splits[0] for split in data_splits), "All elements in data_splits should be the same"
+        need_estimate_pareto_front: bool = data_splits[0] != "train"
+        new_pareto_frontier_points: List[list[float]] = []
 
         for group_uid, indices in uid2indices.items():
             group_scores = score_tensor[indices]  # (group_size, dim)
@@ -267,7 +302,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             )
             assert contributions.shape == (len(indices),)
 
-            # contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
+            contributions = self._scale_contributions(contributions, self.reward_scaling_mode)
 
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
@@ -277,18 +312,19 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 # reference_points_per_sample[global_idx] = ref_point.tolist()
                 group_sizes[global_idx] = len(indices)
 
-                # add points into pareto cache if the contribution is positive and split is not train
-                split = data_splits[global_idx]
-                if split != "train" and contribution > 0:
-                    non_dominate_points.append(group_scores[local_idx].tolist())
-
                 valid_response_length = valid_response_lengths[global_idx]
                 if valid_response_length > 0:
                     reward_tensor[global_idx, valid_response_length - 1] = contributions[local_idx]
 
+            if need_estimate_pareto_front:
+                assert len(group_scores) > 1, "For estimating pareto front, only one sample may cause large estimation error"
+                group_average_score = group_scores.mean(dim=0).tolist()
+                print(f"[Amo][HV] Estimating pareto front for group {group_uid} with average score {group_average_score}")
+                new_pareto_frontier_points.append(group_average_score)
+
         # update pareto cache
-        if non_dominate_points:
-            self.pareto_cache.update(non_dominate_points)
+        if need_estimate_pareto_front and new_pareto_frontier_points:
+            self.pareto_cache.update(new_pareto_frontier_points)
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -308,10 +344,12 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 for reward_fn_name, score in zip(self.compute_score.keys(), individual_scores_list[i]):
                     print(f"[{reward_fn_name} score]", score)
                 print("[hv_contribution]", hv_contributions[i].item())
+                print("[distance_penalty]", distance_penalty[i].item())
                 # print("[total_hv]", total_hv[i].item())
 
             # Attach HV-related extra information (aligned with sample order)
             reward_extra_info["hv_contribution"].append(hv_contributions[i].item())
+            reward_extra_info["distance_penalty"].append(distance_penalty[i].item())
             # reward_extra_info["reference_point"].append(reference_points_per_sample[i])
             reward_extra_info["group_size"].append(group_sizes[i])
             reward_extra_info["cache_size"].append(cache_sizes[i])
@@ -327,8 +365,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
     # ------------------------------------------------------------------
     # Helper methods
     # ------------------------------------------------------------------    @staticmethod
-    @staticmethod
     def _compute_hybrid_reward(
+        self,
         group_vectors: torch.Tensor,
         ref_point: torch.Tensor,
         pareto_vectors: torch.Tensor,
@@ -349,7 +387,10 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # Compute hybrid reward for each point in the group
         rewards = []
         for point in group_vectors:
-            reward = HybridRewardModel.compute_hybrid_reward(point, pareto_vectors, ref_point)
+            reward = HybridRewardModel.compute_hybrid_reward(
+                point, pareto_vectors, ref_point,
+                distance_metric=self.distance_metric,
+            )
             rewards.append(reward)
         
         # Return tensor with rewards for each point

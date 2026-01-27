@@ -334,13 +334,10 @@ amo_strategy:
     reference_point_strategy: static
 
     # Static reference point for HV computation
-    reference_point: none
+    reference_point: null
 
     # Margin to add to the reference point when using dynamic strategies
     reference_point_margin: 0.0
-
-    # Whether to clip negative HV contributions to zero
-    clip_negative: False
 
     # Reward scaling mode: "min-max", "z-score", or "none"
     reward_scaling_mode: none

@@ -18,18 +18,14 @@ REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE
 EPOCH=100
 
 NUM_NODES=1
-NUM_GPUS_PER_NODE=2
+NUM_GPUS_PER_NODE=4
 MICRO_BATCH_SIZE_PER_GPU=25
 TENSOR_MODEL_PARALLEL_SIZE=1
 
-HV_REFERENCE_POINT="[-0.0, -0.0, -0.0]"
-
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=hvpo \
     amo_strategy.enable=True \
-    amo_strategy.method=hvpo \
-    amo_strategy.hv_config.reference_point="$HV_REFERENCE_POINT" \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=100 \
@@ -69,6 +65,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
-    trainer.save_freq=20 \
+    trainer.save_freq=10 \
     trainer.test_freq=5 \
     trainer.total_epochs=$EPOCH $@

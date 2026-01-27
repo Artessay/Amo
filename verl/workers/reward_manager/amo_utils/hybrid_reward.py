@@ -34,6 +34,8 @@ class HybridRewardModel:
                 distance = HybridRewardModel.compute_chebyshev_distance_to_pareto(point, pareto_vectors)
             elif distance_metric == "euclidean":
                 distance = HybridRewardModel.compute_euclidean_distance_to_pareto(point, pareto_vectors)
+            elif distance_metric == "none":
+                distance = point.new_tensor(0.0)
             else:
                 raise ValueError(f"Unknown distance metric: {distance_metric}")
             

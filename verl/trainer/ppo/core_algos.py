@@ -97,6 +97,7 @@ class AdvantageEstimator(str, Enum):
     GAE = "gae"
     GRPO = "grpo"
     GDPO = "gdpo"
+    HVPO = "hvpo"
     REINFORCE_PLUS_PLUS = "reinforce_plus_plus"
     REINFORCE_PLUS_PLUS_BASELINE = "reinforce_plus_plus_baseline"
     REMAX = "remax"
