@@ -341,3 +341,6 @@ amo_strategy:
 
     # Reward scaling mode: "min-max", "z-score", or "none"
     reward_scaling_mode: none
+
+    # distance metric
+    distance_metric: "chebyshev"

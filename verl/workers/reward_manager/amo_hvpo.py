@@ -86,6 +86,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # config
         self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
         self.distance_metric: str = hv_config.get("distance_metric", "chebyshev")
+        assert self.distance_metric in ["chebyshev", "euclidean", "none"]
 
         self._configure_reference_point()
         self._configure_pareto_cache()
