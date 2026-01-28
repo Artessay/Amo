@@ -1,0 +1,68 @@
+set -x
+
+
+WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
+echo "Using workspace: $WORKSPACE"
+
+PROJECT_NAME="amo_pku-saferlhf"
+EXPERIMENT_NAME="llama3.2-3b_hvpo"
+
+TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
+VAL_FILES="$WORKSPACE/data/PKU-SafeRLHF/test.parquet"
+
+MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
+
+REWARD_MANAGER="amo_hvpo"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
+
+EPOCH=15
+
+NUM_NODES=1
+NUM_GPUS_PER_NODE=2
+MICRO_BATCH_SIZE_PER_GPU=16
+TENSOR_MODEL_PARALLEL_SIZE=1
+
+# [Amo] use LoRA and sync reward score
+python3 -m verl.trainer.main_ppo \
+    algorithm.adv_estimator=hvpo \
+    amo_strategy.enable=True \
+    data.train_files=$TRAIN_FILES \
+    data.val_files=$VAL_FILES \
+    data.train_batch_size=512 \
+    data.max_prompt_length=512 \
+    data.max_response_length=512 \
+    data.filter_overlong_prompts=True \
+    data.truncation='error' \
+    +data.apply_chat_template_kwargs.enable_thinking=False \
+    actor_rollout_ref.model.path=$MODEL_PATH \
+    actor_rollout_ref.actor.optim.lr=5e-6 \
+    actor_rollout_ref.model.use_remove_padding=True \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
+    actor_rollout_ref.actor.use_kl_loss=True \
+    actor_rollout_ref.actor.kl_loss_coef=0.001 \
+    actor_rollout_ref.actor.kl_loss_type=low_var_kl \
+    actor_rollout_ref.actor.entropy_coeff=0 \
+    actor_rollout_ref.model.enable_gradient_checkpointing=True \
+    actor_rollout_ref.actor.fsdp_config.param_offload=False \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=$TENSOR_MODEL_PARALLEL_SIZE \
+    actor_rollout_ref.rollout.name=vllm \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
+    actor_rollout_ref.rollout.mode=sync \
+    actor_rollout_ref.rollout.n=4 \
+    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
+    actor_rollout_ref.ref.fsdp_config.param_offload=True \
+    algorithm.use_kl_in_reward=False \
+    reward_model.reward_manager=$REWARD_MANAGER \
+    custom_reward_function.path=$REWARD_FUNCTION_PATH \
+    trainer.critic_warmup=0 \
+    trainer.logger='["console", "swanlab"]' \
+    trainer.project_name=$PROJECT_NAME \
+    trainer.experiment_name=$EXPERIMENT_NAME \
+    trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
+    trainer.nnodes=$NUM_NODES \
+    trainer.save_freq=10 \
+    trainer.test_freq=5 \
+    trainer.total_epochs=$EPOCH $@
