@@ -9,17 +9,20 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    # "MATH-lighteval"
+    "MATH-lighteval"
     # "PKU-SafeRLHF"
     # "RLLA"
-    "CNN_DailyMail"
+    # "CNN_DailyMail"
 )
 
-# BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
-# EXPERIMENTS=(
-#     "qwen2.5-1.5b_grpo"
-#     "qwen2.5-1.5b_gdpo"
-# )
+BASE_MODEL="/data/Qwen/Qwen2.5-1.5B-Instruct"
+EXPERIMENTS=(
+    # "qwen2.5-1.5b_grpo"
+    # "qwen2.5-1.5b_gdpo"
+    # "qwen2.5-1.5b_hvpo"
+    "qwen2.5-1.5b_hvpo_distance"
+    "qwen2.5-1.5b_hvpo_euclidean"
+)
 
 # BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 # EXPERIMENTS=(
@@ -29,11 +32,11 @@ DATASETS=(
 # )
 
 # BASE_MODEL="/data/meta-llama/Llama-3.2-3B-Instruct"
-EXPERIMENTS=(
+# EXPERIMENTS=(
     # "llama3.2-3b_grpo"
     # "llama3.2-3b_gdpo"
-    "llama3.2-3b_hvpo"
-)
+    # "llama3.2-3b_hvpo"
+# )
 
 
 # Merge LoRA checkpoints

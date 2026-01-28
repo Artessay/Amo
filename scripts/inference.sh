@@ -7,10 +7,10 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    # "MATH-lighteval"
+    "MATH-lighteval"
     # "PKU-SafeRLHF"
     # "RLLA"
-    "CNN_DailyMail"
+    # "CNN_DailyMail"
 )
 
 if [ -n "$MODEL_PATH" ]; then
@@ -25,6 +25,7 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
+    # "qwen2.5-1.5b_hvpo"
 
     # "qwen2.5-3b"
     # "qwen2.5-3b_grpo"
@@ -34,7 +35,10 @@ EXPERIMENTS=(
     # "llama3.2-3b"
     # "llama3.2-3b_grpo"
     # "llama3.2-3b_gdpo"
-    "llama3.2-3b_hvpo"
+    # "llama3.2-3b_hvpo"
+
+    "qwen2.5-1.5b_hvpo_distance"
+    "qwen2.5-1.5b_hvpo_euclidean"
 )
 
 # Evaluation
