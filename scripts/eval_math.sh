@@ -12,7 +12,7 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
-    # "qwen2.5-1.5b_hvpo"
+    "qwen2.5-1.5b_hvpo"
     
     # "qwen2.5-3b"
     # "qwen2.5-3b_grpo"
@@ -27,8 +27,8 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_distance"
     # "qwen2.5-1.5b_hvpo_euclidean"
 
-    "qwen2.5-1.5b_hvpo_lag1"
-    "qwen2.5-1.5b_hvpo_lag3"
+    # "qwen2.5-1.5b_hvpo_lag1"
+    # "qwen2.5-1.5b_hvpo_lag3"
     # "qwen2.5-1.5b_hvpo_lag7"
 )
 
