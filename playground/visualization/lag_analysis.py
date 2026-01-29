@@ -88,8 +88,7 @@ plt.show()
 
 # 打印数据
 print("Lag Analysis Results:")
-print("Lag | Accuracy | Conciseness | Format    | HV")
+print("Lag | Accuracy | Conciseness | Format")
 print("-" * 50)
 for i, lag in enumerate(lags):
-    hv = accuracy[i] * conciseness[i] * format[i]
-    print(f"{lag:3d} | {accuracy[i]:.4f}    | {conciseness[i]:.4f}     | {format[i]:.4f}    | {hv:.4f}")
+    print(f"{lag:3d} | {accuracy[i]:.4f}    | {conciseness[i]:.4f}     | {format[i]:.4f}")
