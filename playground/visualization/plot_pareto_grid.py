@@ -67,25 +67,71 @@ def hypervolume_2d_max(points: np.ndarray, ref: tuple[float, float]) -> float:
         prev_x = x
     return float(hv)
 
+# def build_hv_polygon(front: np.ndarray, ref: tuple[float, float]) -> tuple[np.ndarray, np.ndarray]:
+#     """构造阶梯填充多边形，用于展示HV覆盖区域。"""
+#     rx, ry = ref
+#     if front.size == 0:
+#         return np.array([rx]), np.array([ry])
+
+#     front = front[np.argsort(front[:, 0])]  # helpful 升序
+#     xs = [rx, front[0, 0]]
+#     ys = [ry, ry]
+
+#     cur_y = ry
+#     for x, y in front:
+#         xs.append(x); ys.append(cur_y)  # 横
+#         xs.append(x); ys.append(y)      # 竖
+#         cur_y = y
+
+#     xs.append(front[-1, 0]); ys.append(ry)
+#     xs.append(rx);           ys.append(ry)
+#     return np.array(xs), np.array(ys)
+
 def build_hv_polygon(front: np.ndarray, ref: tuple[float, float]) -> tuple[np.ndarray, np.ndarray]:
-    """构造阶梯填充多边形，用于展示HV覆盖区域。"""
+    """构造 2D maximize 的HV覆盖区域阶梯多边形（ref在左下）。"""
     rx, ry = ref
     if front.size == 0:
-        return np.array([rx]), np.array([ry])
+        return np.array([rx, rx]), np.array([ry, ry])
 
-    front = front[np.argsort(front[:, 0])]  # helpful 升序
-    xs = [rx, front[0, 0]]
-    ys = [ry, ry]
+    # helpful 升序
+    front = front[np.argsort(front[:, 0])]
 
+    xs = [rx]
+    ys = [ry]
+
+    prev_x = rx
     cur_y = ry
+
     for x, y in front:
-        xs.append(x); ys.append(cur_y)  # 横
-        xs.append(x); ys.append(y)      # 竖
+        # 横：从 (prev_x, cur_y) -> (x, cur_y)
+        xs += [prev_x, x]
+        ys += [cur_y, cur_y]
+
+        # 竖：从 (x, cur_y) -> (x, y)
+        xs += [x]
+        ys += [y]
+
+        prev_x = x
         cur_y = y
 
-    xs.append(front[-1, 0]); ys.append(ry)
-    xs.append(rx);           ys.append(ry)
+    # 关到底边，再回到ref
+    xs += [prev_x, rx]
+    ys += [ry, ry]
+
     return np.array(xs), np.array(ys)
+
+def fill_hv_rects(ax, front: np.ndarray, ref: tuple[float, float], color, alpha=0.25, zorder=1):
+    rx, ry = ref
+    if front.size == 0:
+        return
+    front = front[np.argsort(front[:, 0])]  # x升序
+    prev_x = rx
+    for x, y in front:
+        if x > prev_x and y > ry:
+            ax.fill_between([prev_x, x], [ry, ry], [y, y], color=color, alpha=alpha, zorder=zorder)
+        prev_x = x
+
+
 
 # ====== 3x3 绘图（输入9个jsonl路径） ======
 def plot_pareto_grid_3x3_from_files(
@@ -165,15 +211,17 @@ def plot_pareto_grid_3x3_from_files(
 
         # HV 填充 + 前沿
         if front.size > 0:
-            xs, ys = build_hv_polygon(front, ref_point)
-            ax.fill(xs, ys, color=fill_c, alpha=0.25, zorder=1)
+            # xs, ys = build_hv_polygon(front, ref_point)
+            # ax.fill(xs, ys, color=fill_c, alpha=0.25, zorder=1)
+            fill_hv_rects(ax, front, ref_point, fill_c, alpha=0.25, zorder=1)
             ax.plot(front[:, 0], front[:, 1], linestyle="--", linewidth=2.0, color=edge_c, zorder=3)
             ax.scatter(front[:, 0], front[:, 1], s=26, color=edge_c, zorder=4)
 
         # 参考点
         ax.scatter([ref_point[0]], [ref_point[1]], s=18, color="black", zorder=5)
 
-        ax.set_title(f"{group_names[i]}\nHV={hv:.4g}", fontsize=10)
+        title = f"{group_names[i]}\nHV={hv:.4f}" if "qwen2.5-1.5b" in group_names[i] else f"\n\n{group_names[i]}\nHV={hv:.4f}"
+        ax.set_title(title, fontsize=10)
         ax.grid(True, linestyle=":", alpha=0.5)
 
         if xlim is not None:
@@ -183,11 +231,11 @@ def plot_pareto_grid_3x3_from_files(
 
     # 外圈坐标轴标签
     for r in range(3):
-        axes[r * 3].set_ylabel("harmless_score")
+        axes[r * 3].set_ylabel("harmless")
     for c in range(3):
-        axes[6 + c].set_xlabel("helpful_score")
+        axes[6 + c].set_xlabel("helpful")
 
-    fig.suptitle("Pareto Fronts (3×3) + Hypervolume Coverage", fontsize=14)
+    # fig.suptitle("Pareto Fronts (3×3) + Hypervolume Coverage", fontsize=14)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     out = Path(output_path)
@@ -197,21 +245,21 @@ def plot_pareto_grid_3x3_from_files(
     print(f"Saved to: {out.resolve()}")
 
 if __name__ == "__main__":
-    paths = [
-        "path/to/exp1.jsonl",
-        "path/to/exp2.jsonl",
-        "path/to/exp3.jsonl",
-        "path/to/exp4.jsonl",
-        "path/to/exp5.jsonl",
-        "path/to/exp6.jsonl",
-        "path/to/exp7.jsonl",
-        "path/to/exp8.jsonl",
-        "path/to/exp9.jsonl",
+    
+    experiments = [
+        "qwen2.5-1.5b_grpo", "qwen2.5-1.5b_gdpo", "qwen2.5-1.5b_hvpo",
+        "qwen2.5-3b_grpo", "qwen2.5-3b_gdpo", "qwen2.5-3b_hvpo",
+        "llama3.2-3b_grpo", "llama3.2-3b_gdpo", "llama3.2-3b_hvpo",
     ]
+
+    paths = [f"playground/visualization/scores/{exp}.jsonl" for exp in experiments]
+    print(paths)
+
     plot_pareto_grid_3x3_from_files(
         jsonl_paths=paths,
-        output_path="pareto_grid_3x3.png",  # 或 "pareto_grid_3x3.pdf"
-        ref_point=None,                      # 或手动指定 (rx, ry)
+        output_path="playground/visualization/pareto_grid_3x3.png",  # 或 "pareto_grid_3x3.pdf"
+        ref_point=(0, 0),                      # 或手动指定 (rx, ry)
+        # ref_point=None,                      # 或手动指定 (rx, ry)
         share_axes=True,
         titles=None,                         # 可传入长度为9的自定义标题列表
     )
