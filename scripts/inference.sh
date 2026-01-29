@@ -1,5 +1,5 @@
 set -x
-export CUDA_VISIBLE_DEVICES=4
+
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
