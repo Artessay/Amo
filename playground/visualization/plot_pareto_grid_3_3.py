@@ -251,13 +251,14 @@ if __name__ == "__main__":
         "qwen2.5-3b_grpo", "qwen2.5-3b_gdpo", "qwen2.5-3b_hvpo",
         "llama3.2-3b_grpo", "llama3.2-3b_gdpo", "llama3.2-3b_hvpo",
     ]
+    output_name = "pareto_grid_3x3.pdf"
 
     paths = [f"playground/visualization/scores/{exp}.jsonl" for exp in experiments]
     print(paths)
 
     plot_pareto_grid_3x3_from_files(
         jsonl_paths=paths,
-        output_path="playground/visualization/pareto_grid_3x3.png",  # 或 "pareto_grid_3x3.pdf"
+        output_path=f"playground/visualization/{output_name}.png",  # 或 "pareto_grid_3x3.pdf"
         ref_point=(0, 0),                      # 或手动指定 (rx, ry)
         # ref_point=None,                      # 或手动指定 (rx, ry)
         share_axes=True,

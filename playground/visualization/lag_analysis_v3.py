@@ -32,8 +32,8 @@ for file in files:
 accuracy     = np.array(accuracy)
 conciseness  = np.array(conciseness)
 format_score = np.array(format_score)
-# overall = (accuracy + conciseness + format_score) / 3
-overall = (accuracy * conciseness * format_score) 
+overall = (accuracy + conciseness + format_score) / 3
+# overall = (accuracy * conciseness * format_score) 
 print("overall", overall)
 # ======================
 # 指标配置
@@ -42,8 +42,8 @@ metrics = [
     ("Correctness", accuracy,     (0.73, 0.79), "#023047"),
     ("Conciseness", conciseness, (0.935, 0.975), "#E76F51"),
     ("Clarity", format_score,   (0.97, 0.995), "#8AB17D"),
-    # ("Overall", overall,       (0.88, 0.91), "#6A4C93"), # 新增 Overall 图表
-    ("Hypervolume", overall,       (0.65, 0.75), "#6A4C93"), # 新增 Overall 图表
+    ("Overall", overall,       (0.88, 0.91), "#6A4C93"), # 新增 Overall 图表
+    # ("Overall", overall,       (0.65, 0.75), "#6A4C93"), # 新增 Overall 图表
 ]
 
 # ======================
