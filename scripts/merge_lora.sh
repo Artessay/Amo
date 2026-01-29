@@ -9,8 +9,8 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    # "MATH-lighteval"
-    "PKU-SafeRLHF"
+    "MATH-lighteval"
+    # "PKU-SafeRLHF"
     # "RLLA"
     # "CNN_DailyMail"
 )
