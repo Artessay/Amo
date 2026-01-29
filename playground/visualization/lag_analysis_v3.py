@@ -43,11 +43,6 @@ print("overall",overall)
 # ======================
 # 指标配置
 # ======================
-# metrics = [
-#     ("Accuracy", accuracy,     (0.73, 0.78), "#023047", +1),
-#     ("Conciseness", conciseness, (0.94, 0.97), "#E76F51", +1),
-#     ("Format", format_score,   (0.97, 0.99), "#8AB17D", +1),
-# ]
 metrics = [
     ("Correctness", accuracy,     (0.73, 0.79), "#023047"),
     ("Conciseness", conciseness, (0.935, 0.975), "#E76F51"),
