@@ -251,7 +251,7 @@ if __name__ == "__main__":
         "qwen2.5-3b_grpo", "qwen2.5-3b_gdpo", "qwen2.5-3b_hvpo",
         "llama3.2-3b_grpo", "llama3.2-3b_gdpo", "llama3.2-3b_hvpo",
     ]
-    output_name = "pareto_grid_3x3.pdf"
+    output_name = "pareto_grid_3x3"
 
     paths = [f"playground/visualization/scores/{exp}.jsonl" for exp in experiments]
     print(paths)
