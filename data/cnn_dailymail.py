@@ -56,33 +56,16 @@ def main():
         default="./CNN_DailyMail",
         help="Directory to save the preprocessed parquet files.",
     )
-    parser.add_argument(
-        "--train_percentage",
-        type=float,
-        default=1.0,
-        help="Percentage of training data to use (0.0 to 100.0). Default: 1.0",
-    )
-    parser.add_argument(
-        "--test_percentage",
-        type=float,
-        default=5.0,
-        help="Percentage of test data to use (0.0 to 100.0). Default: 5.0",
-    )
 
     args = parser.parse_args()
 
     data_source = "abisee/cnn_dailymail"
-
     dataset = datasets.load_dataset(data_source, "3.0.0")
 
-    # Calculate sample size (1% of the original data)
-    train_fraction = args.train_percentage / 100.0
-    test_fraction = args.test_percentage / 100.0
-    
     # Sample each split
-    train_dataset = dataset["train"].shuffle(seed=42).select(range(int(len(dataset["train"]) * train_fraction)))
-    val_dataset = dataset["validation"].shuffle(seed=42).select(range(int(len(dataset["validation"]) * test_fraction)))
-    test_dataset = dataset["test"].shuffle(seed=42).select(range(int(len(dataset["test"]) * test_fraction)))
+    train_dataset = dataset["train"]
+    val_dataset = dataset["validation"]
+    test_dataset = dataset["test"]
 
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Validation dataset size: {len(val_dataset)}")

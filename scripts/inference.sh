@@ -21,6 +21,8 @@ fi
 # MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 # MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
+MODEL_PATH="/data/Qwen/Qwen3-4B"
+
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
@@ -30,11 +32,11 @@ EXPERIMENTS=(
     # "qwen2.5-3b"
     # "qwen2.5-3b_grpo"
     # "qwen2.5-3b_gdpo"
-    "qwen2.5-3b_hvpo"
+    # "qwen2.5-3b_hvpo"
 
     # "llama3.2-3b"
-    #  "llama3.2-3b_grpo"
-    #  "llama3.2-3b_gdpo"
+    # "llama3.2-3b_grpo"
+    # "llama3.2-3b_gdpo"
     # "llama3.2-3b_hvpo"
 
     # "qwen2.5-1.5b_hvpo_distance"
@@ -43,6 +45,8 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_lag1"
     # "qwen2.5-1.5b_hvpo_lag3"
     # "qwen2.5-1.5b_hvpo_lag7"
+
+    "qwen3-4b"
 )
 
 # Evaluation

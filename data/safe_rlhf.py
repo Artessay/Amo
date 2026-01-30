@@ -26,31 +26,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--local_save_dir", default="./PKU-SafeRLHF", help="The save directory for the preprocessed dataset."
     )
-    parser.add_argument(
-        "--train_percentage",
-        type=float,
-        default=5.0,
-        help="Percentage of training data to use (0.0 to 100.0). Default: 1.0",
-    )
-    parser.add_argument(
-        "--test_percentage",
-        type=float,
-        default=10.0,
-        help="Percentage of test data to use (0.0 to 100.0). Default: 5.0",
-    )
 
     args = parser.parse_args()
+    local_dataset_path = args.local_dataset_path
 
     data_source = "PKU-Alignment/PKU-SafeRLHF"
+
     dataset = datasets.load_dataset(data_source)
 
-    # Calculate sample size (1% of the original data)
-    train_fraction = args.train_percentage / 100.0
-    test_fraction = args.test_percentage / 100.0
-    
-    # Sample each split
-    train_dataset = dataset["train"].shuffle(seed=42).select(range(int(len(dataset["train"]) * train_fraction)))
-    test_dataset = dataset["test"].shuffle(seed=42).select(range(int(len(dataset["test"]) * test_fraction)))
+    train_dataset = dataset["train"]
+    test_dataset = dataset["test"]
 
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Test dataset size: {len(test_dataset)}")

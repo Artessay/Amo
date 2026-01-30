@@ -93,7 +93,6 @@ setup(
     url="https://github.com/Artessay/Amo",
     license="Apache 2.0",
     author="Rihong Qiu",
-    author_email="rihong.edu@gmail.com",
     description="Amo: Aligning LLMs with Multiple Objects",
     install_requires=install_requires,
     extras_require=extras_require,
