@@ -7,8 +7,8 @@ echo "Using workspace: $WORKSPACE"
 PROJECT_NAME="amo_math-lighteval"
 EXPERIMENT_NAME="qwen2.5-3b_hvpo"
 
-TRAIN_FILES="$WORKSPACE/data/MATH-lighteval/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
+TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 

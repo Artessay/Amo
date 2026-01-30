@@ -5,7 +5,7 @@ echo "Using workspace: $WORKSPACE"
 
 DATASETS=(
     #"MATH-500" 
-    "MATH-lighteval"
+    "MATH-LightEval"
 )
 
 EXPERIMENTS=(
