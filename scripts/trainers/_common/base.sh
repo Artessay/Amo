@@ -45,6 +45,7 @@ configure_h2_weight_variant() {
 # override these values before launch.sh resolves environment overrides.
 configure_base() {
     PROFILE_EPOCHS=1
+    PROFILE_ACTOR_LR=1e-5
     PROFILE_TRAIN_BATCH_SIZE=512
     PROFILE_MAX_PROMPT_LENGTH=2048
     PROFILE_MAX_RESPONSE_LENGTH=1024

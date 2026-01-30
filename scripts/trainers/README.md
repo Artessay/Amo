@@ -31,6 +31,22 @@ bash scripts/trainers/grpo/run_math-lighteval.sh 3b 1 --dry-run \
   data.train_batch_size=64 actor_rollout_ref.rollout.n=2
 ```
 
+## Learning rate 最佳实践
+
+以下 actor learning rate 从目录重构前的 GDPO、GRPO、HVPO 启动脚本中恢复。同一
+backbone 的值在三个方法及其已有数据集之间一致，因此统一入口将其作为 model profile
+默认值：
+
+| LLM backbone | MATH-500 | MATH-LightEval | NEWS | PKU-SafeRLHF | RLLA |
+|---|---:|---:|---:|---:|---:|
+| Qwen2.5-1.5B-Instruct | `2e-4` | `2e-4` | `2e-4` | `2e-4` | `2e-4` |
+| Qwen2.5-3B-Instruct | `1e-4` | `1e-4` | `1e-4` | `1e-4` | `1e-4` |
+| Llama-3.2-3B-Instruct | — | `5e-6` | `5e-6` | `5e-6` | `5e-6` |
+
+`—` 表示旧脚本没有对应的调参记录。ParaDetox 同样不在这批历史调参脚本中；统一入口
+仍会沿用所选 backbone 的 model profile 默认值，但这不应视为已有最佳结果。临时实验可用
+`ACTOR_LR=<value>` 或末尾的 Hydra override 覆盖。
+
 ## 目录结构
 
 ```text
@@ -166,7 +182,7 @@ _common/base.sh
 职责划分如下：
 
 - base profile：共同的 batch、rollout、KL、保存频率、logger 等基础值。
-- model profile：模型路径、LoRA 参数和 canonical model tag。
+- model profile：模型路径、actor learning rate、LoRA 参数和 canonical model tag。
 - dataset profile：train/validation parquet、reward functions、长度、batch、epoch、项目名和结果数据集名。
 - method profile：`adv_estimator`、`reward_manager` 与方法专属参数。
 - variant：只用于已声明的消融实验。
@@ -177,6 +193,7 @@ _common/base.sh
 |---|---|
 | `AMO_PY` | Python 可执行文件；训练默认 `python3` |
 | `AMO_MODEL_PATH` | 覆盖当前所选模型的本地路径 |
+| `ACTOR_LR` | 覆盖当前所选模型的 actor learning rate |
 | `TRAIN_GPUS` | 训练 GPU 列表；未设置时可沿用已有 `CUDA_VISIBLE_DEVICES` |
 | `TRAIN_BATCH_SIZE`、`PPO_MINI_BATCH_SIZE`、`MICRO_BATCH_SIZE_PER_GPU` | batch 配置 |
 | `MAX_PROMPT_LENGTH`、`MAX_RESPONSE_LENGTH` | token 长度 |

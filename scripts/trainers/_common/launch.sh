@@ -117,6 +117,7 @@ configure_method
 [[ -n ${REWARD_FUNCTION_PATH:-} ]] || die "$DATASET_PROFILE did not set REWARD_FUNCTION_PATH"
 
 TOTAL_EPOCHS=${EPOCH_OVERRIDE:-$PROFILE_EPOCHS}
+ACTOR_LR=${ACTOR_LR:-$PROFILE_ACTOR_LR}
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-$PROFILE_TRAIN_BATCH_SIZE}
 MAX_PROMPT_LENGTH=${MAX_PROMPT_LENGTH:-$PROFILE_MAX_PROMPT_LENGTH}
 MAX_RESPONSE_LENGTH=${MAX_RESPONSE_LENGTH:-$PROFILE_MAX_RESPONSE_LENGTH}
@@ -177,7 +178,7 @@ COMMAND=(
     "data.truncation=error"
     "+data.apply_chat_template_kwargs.enable_thinking=False"
     "actor_rollout_ref.model.path=$MODEL_PATH"
-    "actor_rollout_ref.actor.optim.lr=1e-5"
+    "actor_rollout_ref.actor.optim.lr=$ACTOR_LR"
     "actor_rollout_ref.model.use_remove_padding=True"
     "actor_rollout_ref.actor.ppo_mini_batch_size=$PPO_MINI_BATCH_SIZE"
     "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU"
