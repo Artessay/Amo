@@ -13,7 +13,7 @@ VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
 EPOCH=50
 
