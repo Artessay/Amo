@@ -45,6 +45,7 @@ install_requires = [
     "tensorboard",
 ]
 
+AMO_REQUIRES = ["grpcio-tools", "python-dotenv", "swanlab"]
 TEST_REQUIRES = ["pytest", "pre-commit", "py-spy", "pytest-asyncio", "pytest-rerunfailures"]
 PRIME_REQUIRES = ["pyext"]
 GEO_REQUIRES = ["mathruler", "torchvision", "qwen_vl_utils"]
@@ -62,6 +63,7 @@ MCORE_REQUIRES = ["mbridge"]
 TRANSFERQUEUE_REQUIRES = ["TransferQueue==0.1.5"]
 
 extras_require = {
+    "amo": AMO_REQUIRES,
     "test": TEST_REQUIRES,
     "prime": PRIME_REQUIRES,
     "geo": GEO_REQUIRES,

@@ -49,7 +49,7 @@ GRPO is a reinforcement learning algorithm that eliminates the need for a separa
 conda create -n amo python=3.13 -y
 conda activate amo
 
-pip install -e .[vllm]
+pip install -e .[amo,vllm]
 
 # Install flash attention 2, you can download it from https://github.com/Dao-AILab/flash-attention/releases
 pip install flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
@@ -97,6 +97,13 @@ Download necessary models from ModelScope for training and evaluation.
 modelscope download --model Qwen/Qwen2.5-1.5B-Instruct  --local_dir /data/Qwen/Qwen2.5-1.5B-Instruct
 modelscope download --model Qwen/Qwen2.5-3B-Instruct  --local_dir /data/Qwen/Qwen2.5-3B-Instruct
 modelscope download --model LLM-Research/Llama-3.2-3B-Instruct  --local_dir /data/meta-llama/Llama-3.2-3B-Instruct
+```
+
+Download the reward models from ModelScope for PKU-SafeRLHF.
+
+```bash
+modelscope download --model PKU-Alignment/beaver-7b-v3.0-reward  --local_dir /data/PKU-Alignment/beaver-7b-v3.0-reward
+modelscope download --model PKU-Alignment/beaver-7b-v3.0-cost  --local_dir /data/PKU-Alignment/beaver-7b-v3.0-cost
 ```
 
 ## 🚀 Usage Examples
