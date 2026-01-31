@@ -45,7 +45,7 @@ for DATASET in "${DATASETS[@]}"; do
             continue
         fi
 
-        python3 -m verl.trainer.amo_eval \
+        python3 -m verl.trainer.amo_eval_serial \
             data.path=$OUTPUT_PATH \
             custom_reward_function.path=$REWARD_FUNCTION_PATH 
     done

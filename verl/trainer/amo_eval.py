@@ -77,6 +77,8 @@ def process_item(config, data_source, response_lst, reward_data):
 def main(config):
     local_path = copy_to_local(config.data.path, use_shm=config.data.get("use_shm", False))
     print(local_path)
+    assert local_path.endswith(".parquet"), "local_path must be a parquet file"
+    
     dataset = pd.read_parquet(local_path)
     responses = dataset[config.data.response_key]
     data_sources = dataset[config.data.data_source_key]

@@ -12,10 +12,11 @@ VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
+ADVANTAGE_ESTIMATOR="grpo"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
-EPOCH=50
+EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -24,7 +25,7 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
+    algorithm.adv_estimator=$ADVANTAGE_ESTIMATOR \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
@@ -36,6 +37,7 @@ python3 -m verl.trainer.main_ppo \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=1e-4 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \
     actor_rollout_ref.model.lora_alpha=16 \
