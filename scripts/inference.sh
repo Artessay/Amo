@@ -7,8 +7,8 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    "MATH-LightEval"
-    # "PKU-SafeRLHF"
+    # "MATH-LightEval"
+    "PKU-SafeRLHF"
     # "RLLA"
     # "CNN_DailyMail"
 )
@@ -17,14 +17,14 @@ if [ -n "$MODEL_PATH" ]; then
     unset MODEL_PATH
 fi
 
-MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+# MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 # MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 # MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
-# MODEL_PATH="/data/Qwen/Qwen3-4B"
+MODEL_PATH="/data/Qwen/Qwen3-4B"
 
 EXPERIMENTS=(
-    "qwen2.5-1.5b"
+    # "qwen2.5-1.5b"
     # "qwen2.5-1.5b_grpo"
     # "qwen2.5-1.5b_gdpo"
     # "qwen2.5-1.5b_hvpo"
@@ -46,7 +46,7 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_lag3"
     # "qwen2.5-1.5b_hvpo_lag7"
 
-    # "qwen3-4b"
+    "qwen3-4b"
 )
 
 # Evaluation
