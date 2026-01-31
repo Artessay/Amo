@@ -1,4 +1,4 @@
-# Copyright 2025 
+# Copyright 2025 Rihong Qiu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,7 +99,6 @@ setup(
     package_data={
         "": ["version/*"],
         "verl": ["trainer/config/*.yaml"],
-        "align_anything": ["*.json", "*.jsonl", "*.yaml", "*.yml"],
     },
     include_package_data=True,
     long_description=long_description,
