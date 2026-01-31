@@ -8,7 +8,7 @@ PROJECT_NAME="Amo_Math-LightEval"
 EXPERIMENT_NAME="qwen2.5-3b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 
@@ -37,6 +37,7 @@ python3 -m verl.trainer.main_ppo \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=1e-4 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.lora_rank=32 \

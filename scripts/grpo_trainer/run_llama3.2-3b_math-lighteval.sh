@@ -8,14 +8,14 @@ PROJECT_NAME="Amo_Math-LightEval"
 EXPERIMENT_NAME="llama3.2-3b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 
 MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
-EPOCH=50
+EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
@@ -36,6 +36,7 @@ python3 -m verl.trainer.main_ppo \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
     actor_rollout_ref.actor.optim.lr=5e-6 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \

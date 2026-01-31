@@ -8,14 +8,14 @@ PROJECT_NAME="Amo_Math-LightEval"
 EXPERIMENT_NAME="qwen2.5-1.5b_hvpo_euclidean"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
 REWARD_MANAGER="amo_hvpo"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
-EPOCH=50
+EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
