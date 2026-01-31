@@ -4,15 +4,15 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="Amo_Math-LightEval"
-EXPERIMENT_NAME="qwen2.5-1.5b_gdpo"
+PROJECT_NAME="Amo_math-lighteval"
+EXPERIMENT_NAME="qwen2.5-1.5b_hvpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 
 MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
 
-REWARD_MANAGER="amo_vanilla"
+REWARD_MANAGER="amo_hvpo"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
 EPOCH=10
@@ -24,7 +24,7 @@ TENSOR_MODEL_PARALLEL_SIZE=1
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=gdpo \
+    algorithm.adv_estimator=hvpo \
     amo_strategy.enable=True \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \

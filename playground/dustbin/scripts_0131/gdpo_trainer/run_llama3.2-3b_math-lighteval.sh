@@ -4,31 +4,28 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="Amo_Math-LightEval"
-EXPERIMENT_NAME="qwen2.5-1.5b_hvpo_distance"
+PROJECT_NAME="Amo_math-lighteval"
+EXPERIMENT_NAME="llama3.2-3b_gdpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 
-MODEL_PATH="/data/Qwen/Qwen2.5-1.5B-Instruct"
+MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
-REWARD_MANAGER="amo_hvpo"
+REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
 EPOCH=10
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=32
+MICRO_BATCH_SIZE_PER_GPU=16
 TENSOR_MODEL_PARALLEL_SIZE=1
-
-DISTANCE_PENALTY=none
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=hvpo \
+    algorithm.adv_estimator=gdpo \
     amo_strategy.enable=True \
-    amo_strategy.hv_config.distance_metric=$DISTANCE_PENALTY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \
@@ -38,10 +35,9 @@ python3 -m verl.trainer.main_ppo \
     data.truncation='error' \
     +data.apply_chat_template_kwargs.enable_thinking=False \
     actor_rollout_ref.model.path=$MODEL_PATH \
-    actor_rollout_ref.actor.optim.lr=2e-4 \
+    actor_rollout_ref.actor.optim.lr=5e-6 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.model.use_remove_padding=True \
-    actor_rollout_ref.model.lora_rank=32 \
-    actor_rollout_ref.model.lora_alpha=16 \
     actor_rollout_ref.actor.ppo_mini_batch_size=128 \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$MICRO_BATCH_SIZE_PER_GPU \
     actor_rollout_ref.actor.use_kl_loss=True \

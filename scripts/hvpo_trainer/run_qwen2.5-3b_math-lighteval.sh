@@ -4,7 +4,7 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="Amo_Math-LightEval"
+PROJECT_NAME="Amo_math-lighteval"
 EXPERIMENT_NAME="qwen2.5-3b_hvpo"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
