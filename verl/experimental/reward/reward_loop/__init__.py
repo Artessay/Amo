@@ -19,7 +19,6 @@ from .limited import RateLimitedRewardLoopManager
 
 # [Amo] 
 from .amo_vanilla import AmoVanillaRewardLoopManager
-from .amo_hv import AmoHVRewardLoopManager
 
 __all__ = [
     "DAPORewardLoopManager",
@@ -29,5 +28,4 @@ __all__ = [
     "get_reward_loop_manager_cls",
 
     "AmoVanillaRewardLoopManager",
-    "AmoHVRewardLoopManager",
 ]

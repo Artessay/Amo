@@ -343,4 +343,4 @@ amo_strategy:
     reward_scaling_mode: none
 
     # distance metric
-    distance_metric: "chebyshev"
+    distance_metric: "euclidean"  # "chebyshev", "manhattan", "euclidean", "none"

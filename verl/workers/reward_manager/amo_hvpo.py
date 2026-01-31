@@ -84,9 +84,10 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         print(f"[Amo][HV] Using HV reward manager with hv_config: {self.hv_config}")
 
         # config
-        self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode", "none")
-        self.distance_metric: str = hv_config.get("distance_metric", "chebyshev")
-        assert self.distance_metric in ["chebyshev", "euclidean", "none"]
+        self.reward_scaling_mode: str = hv_config.get("reward_scaling_mode")
+
+        self.distance_metric: str = hv_config.get("distance_metric")
+        assert self.distance_metric in ["chebyshev", "manhattan", "euclidean", "none"]
 
         self._configure_reference_point()
         self._configure_pareto_cache()
@@ -490,6 +491,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 return contribs - mean
             return (contribs - mean) / (std + 1e-8)
         if mode == "tanh":
-            return 0.5 + 1.5 * torch.tanh(contribs)
+            return torch.tanh(contribs)
 
         raise ValueError(f"[Amo][HV] Unsupported reward_scaling_mode: {mode}")

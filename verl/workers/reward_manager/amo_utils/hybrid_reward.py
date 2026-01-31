@@ -32,6 +32,8 @@ class HybridRewardModel:
             # HV contribution is negative or zero, use distance as reward
             if distance_metric == "chebyshev":
                 distance = HybridRewardModel.compute_chebyshev_distance_to_pareto(point, pareto_vectors)
+            elif distance_metric == "manhattan":
+                distance = HybridRewardModel.compute_manhattan_distance_to_pareto(point, pareto_vectors)
             elif distance_metric == "euclidean":
                 distance = HybridRewardModel.compute_euclidean_distance_to_pareto(point, pareto_vectors)
             elif distance_metric == "none":
@@ -98,6 +100,35 @@ class HybridRewardModel:
         
         # Find the Pareto point that is easiest to reach
         min_distance = max_gaps.min()
+        assert min_distance >= 0.0 # all distance should be non-negative
+        
+        return min_distance
+    
+    @staticmethod
+    def compute_manhattan_distance_to_pareto(
+        point: torch.Tensor,  # (dim,)
+        pareto_vectors: torch.Tensor,  # (K, dim)
+    ) -> torch.Tensor:
+        """Compute the "improvement distance" from a point to the Pareto front.
+        
+        For dominated points, returns the amount of improvement needed to reach the front.
+        Smaller return values indicate proximity to the front (better performance).
+        """
+        if pareto_vectors.numel() == 0:
+            return torch.tensor(0.0, device=point.device)
+        
+        # Calculate the "dominance distance" to each Pareto point
+        # For each dimension, calculate the amount of improvement needed (negative values mean already better)
+        gaps = pareto_vectors - point.unsqueeze(0)  # (K, dim)
+
+        # Each element in gaps should be non-negative
+        assert (gaps >= 0.0).all(), "All elements in gaps should be non-negative"
+        
+        # Use Manhattan distance to each Pareto point
+        distances = gaps.abs().sum(dim=1)  # (K,), actually, abs is not necessary
+        
+        # Find the Pareto point that is easiest to reach
+        min_distance = distances.min()
         assert min_distance >= 0.0 # all distance should be non-negative
         
         return min_distance
