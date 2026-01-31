@@ -2,6 +2,9 @@ import os
 import nltk
 import numpy as np
 
+from verl.utils.reward_score.math_reward import last_boxed_only_string
+
+
 EXPECTED_RESPONSE_REWARD_LENGTH = int(os.getenv("EXPECTED_RESPONSE_REWARD_LENGTH", "384"))
 
 def count_tokens(text: str) -> int:
@@ -12,6 +15,10 @@ def count_tokens(text: str) -> int:
 def compute_score(data_source, solution_str, ground_truth, extra_info=None) -> float:
     """Compute the reward score based on the conciseness of the solution."""
     num_tokens = count_tokens(solution_str)
+
+    # check if the solution meet the boxed format
+    if not last_boxed_only_string(solution_str):
+        return 0.0
     
     # exponential decay 
     return np.exp(-num_tokens / EXPECTED_RESPONSE_REWARD_LENGTH)
