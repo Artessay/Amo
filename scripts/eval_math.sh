@@ -34,7 +34,7 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_lag7"
 )
 
-REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py', '$WORKSPACE/recipe/amo_math/math_conciseness.py']"
+REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py']"
 
 # Evaluation
 for DATASET in "${DATASETS[@]}"; do
