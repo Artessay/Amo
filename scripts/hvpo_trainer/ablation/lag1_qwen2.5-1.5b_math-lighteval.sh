@@ -4,8 +4,8 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_math-lighteval"
-EXPERIMENT_NAME="qwen2.5-1.5b_hvpo_euclidean"
+PROJECT_NAME="Amo_Math-LightEval"
+EXPERIMENT_NAME="qwen2.5-1.5b_hvpo_lag1"
 
 TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
 VAL_FILES="$WORKSPACE/data/MATH-LightEval/val.parquet"
@@ -19,16 +19,13 @@ EPOCH=50
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2
-MICRO_BATCH_SIZE_PER_GPU=32
+MICRO_BATCH_SIZE_PER_GPU=16
 TENSOR_MODEL_PARALLEL_SIZE=1
-
-DISTANCE_PENALTY=euclidean
 
 # [Amo] use LoRA and sync reward score
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=hvpo \
     amo_strategy.enable=True \
-    amo_strategy.hv_config.distance_metric=$DISTANCE_PENALTY \
     data.train_files=$TRAIN_FILES \
     data.val_files=$VAL_FILES \
     data.train_batch_size=512 \
@@ -69,5 +66,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
     trainer.save_freq=10 \
-    trainer.test_freq=5 \
+    trainer.test_freq=1 \
     trainer.total_epochs=$EPOCH $@

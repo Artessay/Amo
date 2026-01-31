@@ -187,7 +187,7 @@ def load_reward_manager(
             final_compute_score = default_compute_score
 
     # [Amo] Prepare HV-specific configuration for HV-based reward managers
-    if config.algorithm.adv_estimator == "hvpo":
+    if reward_manager_cfg.name == "amo_hvpo":
         amo_strategy_cfg = config.get("amo_strategy")
         if amo_strategy_cfg is not None:
             hv_config = amo_strategy_cfg.get("hv_config", {})
