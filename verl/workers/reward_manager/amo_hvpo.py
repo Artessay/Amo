@@ -212,6 +212,7 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             rollout_reward_scores = data_item.non_tensor_batch.get("reward_scores", {})
             extra_info["num_turns"] = num_turns
             extra_info["rollout_reward_scores"] = rollout_reward_scores
+            extra_info["num_tokens"] = valid_response_length    # [Amo] add the number of tokens in the response to extra_info
 
             # [Amo] compute individual scores (one vector per sample)
             single_run_item = asyncio.run(
