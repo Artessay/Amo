@@ -55,12 +55,6 @@ pip install -e .[amo,vllm]
 pip install flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
 ```
 
-Download `nltk` punkt tokenizer for math evaluator.
-
-```bash
-pip install nltk
-python -c "import nltk; nltk.download('punkt_tab')"
-```
 
 Install `grpcio-tools` to generate gRPC code.
 
