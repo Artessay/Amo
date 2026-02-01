@@ -21,7 +21,6 @@ import os
 
 import datasets
 
-from verl.utils.hdfs_io import copy, makedirs
 from verl.utils.reward_score.math_reward import last_boxed_only_string, remove_boxed
 
 
@@ -31,8 +30,6 @@ def extract_solution(solution_str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_dir", default=None)
-    parser.add_argument("--hdfs_dir", default=None)
     parser.add_argument("--local_dataset_path", default=None, help="The local path to the raw dataset, if it exists.")
     parser.add_argument(
         "--local_save_dir", default="./MATH-LightEval", help="The save directory for the preprocessed dataset."
@@ -76,7 +73,7 @@ if __name__ == "__main__":
                 "prompt": [{"role": "user", "content": question}],
                 "ability": "math",
                 "reward_model": {"style": "rule", "ground_truth": solution},
-                "extra_info": {"split": split, "index": idx},
+                "extra_info": {"split": split, "index": idx, "solution": answer},
             }
             return data
 
@@ -85,14 +82,8 @@ if __name__ == "__main__":
     train_dataset = train_dataset.map(function=make_map_fn("train"), with_indices=True)
     test_dataset = test_dataset.map(function=make_map_fn("test"), with_indices=True)
 
-    local_save_dir = args.local_dir
-    if local_save_dir is not None:
-        print("Warning: Argument 'local_dir' is deprecated. Please use 'local_save_dir' instead.")
-    else:
-        local_save_dir = args.local_save_dir
-
+    local_save_dir = args.local_save_dir
     local_dir = os.path.expanduser(local_save_dir)
-    hdfs_dir = args.hdfs_dir
 
     train_dataset.to_parquet(os.path.join(local_dir, "train.parquet"))
     test_dataset.to_parquet(os.path.join(local_dir, "test.parquet"))
@@ -104,7 +95,4 @@ if __name__ == "__main__":
     example = test_dataset[0]
     with open(os.path.join(local_dir, "test_example.json"), "w") as f:
         json.dump(example, f, indent=4)
-    if hdfs_dir is not None:
-        makedirs(hdfs_dir)
-
-        copy(src=local_dir, dst=hdfs_dir)
+    
