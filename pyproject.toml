@@ -95,9 +95,9 @@ ignore_errors = false
 # This corresponds to `include_package_data=True` in setup.py.
 include-package-data = true
 
-# We read the version from a file in 'verl/version/version'
+# We read the version from a file in 'playground/version'
 [tool.setuptools.dynamic]
-version = {file = "verl/version/version"}
+version = {file = "playground/version"}
 
 # If you need to mimic `package_dir={'': '.'}`:
 [tool.setuptools.package-dir]

@@ -95,6 +95,7 @@ setup(
     package_data={
         "": ["version/*"],
         "verl": ["trainer/config/*.yaml"],
+        "align_anything": ["*.json", "*.jsonl", "*.yaml", "*.yml"],
     },
     include_package_data=True,
     long_description=long_description,
