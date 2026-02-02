@@ -1,9 +1,12 @@
 import os
+import re
 import numpy as np
 
 # from verl.utils.reward_score.math_reward import last_boxed_only_string
 from verl.utils.reward_score.math_reward import compute_score as compute_accuracy_boxed
 
+# Boxed answer: at least one non-blank char inside \boxed{…}
+BOXED_RE = re.compile(r"\\boxed\{\s*[^}\s][^}]*\}", re.S)
 
 EXPECTED_RESPONSE_REWARD_LENGTH = int(os.getenv("EXPECTED_RESPONSE_REWARD_LENGTH", "384"))
 
@@ -14,7 +17,7 @@ def compute_score(data_source, solution_str, ground_truth, extra_info=None) -> f
     assert num_tokens > 0, "num_tokens should be greater than 0"
 
     # check if the solution meet the requirement
-    if compute_accuracy_boxed(solution_str, ground_truth) == 0.0:
+    if not BOXED_RE.search(solution_str):
         return 0.0
     
     # exponential decay 
