@@ -30,14 +30,14 @@ def enable_full_determinism(seed: int):
     torch.backends.cudnn.enabled = False
 
 
-def load_model_and_tokenizer(model_path: str):
+def load_model_and_tokenizer(model_path: str, gpu_memory_utilization: float = 0.9):
     # Get the number of available GPUs
     num_gpus = torch.cuda.device_count()
     print(f"Number of available GPUs: {num_gpus}")
 
     # initialize the model
     tokenizer = AutoTokenizer.from_pretrained(model_path, fix_mistral_regex=True)
-    llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=0.9)
+    llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=gpu_memory_utilization)
     
     return llm, tokenizer
 
@@ -59,10 +59,11 @@ def generate(args):
     model_path = args.model
     output_path = args.output
     max_tokens = args.max_tokens
+    gpu_memory_utilization = args.gpu_memory_utilization
 
     enable_full_determinism(seed)
 
-    llm, tokenizer = load_model_and_tokenizer(model_path)
+    llm, tokenizer = load_model_and_tokenizer(model_path, gpu_memory_utilization)
     print(f"Start inference on {data_path} with {model_path}")
 
     # read dataset.
@@ -101,7 +102,9 @@ if __name__ == "__main__":
 
     parser.add_argument('-o', '--output', type=str, help='output path')
 
-    parser.add_argument('-t', '--max_tokens', type=int, default=2048, help='max tokens')
+    parser.add_argument('-t', '--max_tokens', type=int, default=1024, help='max tokens')
+
+    parser.add_argument('-g', '--gpu_memory_utilization', type=float, default=0.9, help='GPU memory utilization')
 
     parser.add_argument('-s', '--seed', type=int, default=42, help='random seed')
 

@@ -4,7 +4,7 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_NAME="amo_pku-saferlhf"
+PROJECT_NAME="Amo_pku-saferlhf"
 EXPERIMENT_NAME="qwen2.5-3b_grpo"
 
 TRAIN_FILES="$WORKSPACE/data/PKU-SafeRLHF/train.parquet"
@@ -15,7 +15,7 @@ MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 REWARD_MANAGER="amo_vanilla"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_safe/safe_helpfulness.py','$WORKSPACE/recipe/amo_safe/safe_harmlessness.py']"
 
-EPOCH=15
+EPOCH=1
 
 NUM_NODES=1
 NUM_GPUS_PER_NODE=2

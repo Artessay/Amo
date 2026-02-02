@@ -5,7 +5,7 @@
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_PREFIX="amo"
+PROJECT_PREFIX="Amo"
 
 DATASETS=(
     # "MATH-500"
@@ -29,7 +29,7 @@ DATASETS=(
 
 BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 EXPERIMENTS=(
-    # "qwen2.5-3b_grpo"
+    "qwen2.5-3b_grpo"
     # "qwen2.5-3b_gdpo"
     "qwen2.5-3b_hvpo"
 )
@@ -72,10 +72,15 @@ for DATASET in "${DATASETS[@]}"; do
                 --target_dir $SAVE_PATH
         else
             echo "Merging LoRA checkpoints for $PROJECT_NAME/$EXPERIMENT_NAME"
-            python3 playground/lora_merger.py \
-                --model_path $BASE_MODEL \
-                --adapter_path $ADAPTER_PATH \
-                --save_path $SAVE_PATH
+            ACTOR_PATH="${WORKSPACE}/checkpoints/${PROJECT_NAME}/${EXPERIMENT_NAME}/global_step_${LATEST_STEP}/actor/"
+            python playground/legacy_model_merger.py merge \
+                --backend fsdp \
+                --local_dir $ACTOR_PATH \
+                --target_dir $SAVE_PATH
+            # python3 playground/lora_merger.py \
+            #     --model_path $BASE_MODEL \
+            #     --adapter_path $ADAPTER_PATH \
+            #     --save_path $SAVE_PATH
         fi
     done
 done

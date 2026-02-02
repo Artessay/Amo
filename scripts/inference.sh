@@ -3,12 +3,12 @@ set -x
 WORKSPACE=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 echo "Using workspace: $WORKSPACE"
 
-PROJECT_PREFIX="amo"
+PROJECT_PREFIX="Amo"
 
 DATASETS=(
     # "MATH-500"
-    # "MATH-LightEval"
-    "PKU-SafeRLHF"
+    "MATH-LightEval"
+    # "PKU-SafeRLHF"
     # "RLLA"
     # "CNN_DailyMail"
 )
@@ -21,7 +21,7 @@ fi
 # MODEL_PATH="/data/Qwen/Qwen2.5-3B-Instruct"
 # MODEL_PATH="/data/meta-llama/Llama-3.2-3B-Instruct"
 
-MODEL_PATH="/data/Qwen/Qwen3-4B"
+# MODEL_PATH="/data/Qwen/Qwen3-4B"
 
 EXPERIMENTS=(
     # "qwen2.5-1.5b"
@@ -30,9 +30,9 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo"
 
     # "qwen2.5-3b"
-    # "qwen2.5-3b_grpo"
+    "qwen2.5-3b_grpo"
     # "qwen2.5-3b_gdpo"
-    # "qwen2.5-3b_hvpo"
+    "qwen2.5-3b_hvpo"
 
     # "llama3.2-3b"
     # "llama3.2-3b_grpo"
@@ -46,8 +46,12 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_lag3"
     # "qwen2.5-1.5b_hvpo_lag7"
 
-    "qwen3-4b"
+    # "qwen3-4b"
 )
+
+MAX_TOKENS=1024
+GPU_MEMORY_UTILIZATION=0.6
+
 
 # Evaluation
 for DATASET in "${DATASETS[@]}"; do
@@ -89,6 +93,8 @@ for DATASET in "${DATASETS[@]}"; do
         python3 playground/generation.py \
             --model $MODEL_PATH \
             --data $DATA_PATH \
-            --output $OUTPUT_PATH
+            --output $OUTPUT_PATH \
+            --max_tokens $MAX_TOKENS \
+            --gpu_memory_utilization $GPU_MEMORY_UTILIZATION 
     done
 done
