@@ -17,7 +17,7 @@ EXPERIMENTS=(
     # "qwen2.5-3b"
     "qwen2.5-3b_grpo"
     # "qwen2.5-3b_gdpo"
-    # "qwen2.5-3b_hvpo"
+    "qwen2.5-3b_hvpo"
 
     # "llama3.2-3b"
     # "llama3.2-3b_grpo"
@@ -47,6 +47,7 @@ for DATASET in "${DATASETS[@]}"; do
 
         python3 -m verl.trainer.amo_eval_serial \
             data.path=$OUTPUT_PATH \
+            data.reward_model_key=extra_info \
             custom_reward_function.path=$REWARD_FUNCTION_PATH 
     done
 done

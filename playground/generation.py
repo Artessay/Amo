@@ -47,10 +47,14 @@ def inference(llm: LLM, prompts: list, sampling_params: SamplingParams):
 
     # convert to text
     output_list = []
+    token_counts = []
     for output in outputs:
         responses = [resp.text.strip() for resp in output.outputs]
         output_list.append(responses)
-    return output_list
+        # Get token counts
+        token_count = sum(len(resp.token_ids) for resp in output.outputs)
+        token_counts.append(token_count)
+    return output_list, token_counts
 
 
 def generate(args):
@@ -79,10 +83,23 @@ def generate(args):
     ]
     
     sampling_params = SamplingParams(n=1, max_tokens=max_tokens, seed=seed)
-    output_list = inference(llm, prompts, sampling_params)
+    output_list, token_counts = inference(llm, prompts, sampling_params)
 
     # add to the data frame
     dataframe["responses"] = output_list
+    
+    # Add num_tokens to extra_info
+    assert "extra_info" in dataframe.columns, "extra_info column is required"
+    
+    # Create a new list of updated extra_info dictionaries
+    updated_extra_info = []
+    for i, row in dataframe.iterrows():
+        extra_info = row.get("extra_info", {})
+        extra_info["num_tokens"] = token_counts[i]
+        updated_extra_info.append(extra_info)
+    
+    # Assign the entire list to the column at once
+    dataframe["extra_info"] = updated_extra_info
 
     # write to a new parquet
     output_dir = os.path.dirname(output_path)

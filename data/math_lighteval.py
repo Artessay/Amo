@@ -73,7 +73,7 @@ if __name__ == "__main__":
                 "prompt": [{"role": "user", "content": question}],
                 "ability": "math",
                 "reward_model": {"style": "rule", "ground_truth": solution},
-                "extra_info": {"split": split, "index": idx, "solution": answer},
+                "extra_info": {"split": split, "index": idx, "solution": answer, "ground_truth": solution},
             }
             return data
 
