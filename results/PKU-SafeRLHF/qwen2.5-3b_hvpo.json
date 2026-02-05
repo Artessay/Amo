@@ -1,0 +1,6 @@
+{
+    "PKU-Alignment/PKU-SafeRLHF": {
+        "safe_helpfulness": 0.9942833362536255,
+        "safe_harmlessness": 0.9932117983236076
+    }
+}
