@@ -52,7 +52,8 @@ conda activate amo
 pip install -e .[vllm]
 
 # Install flash attention 2, you can download it from https://github.com/Dao-AILab/flash-attention/releases
-pip install flash_attn-2.8.3+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
+# For example, `wget https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3.post1/flash_attn-2.8.3.post1+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl`
+pip install flash_attn-2.8.3.post1+cu12torch2.8cxx11abiFALSE-cp313-cp313-linux_x86_64.whl
 ```
 
 Download `nltk` punkt tokenizer for math evaluator.
