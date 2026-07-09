@@ -355,8 +355,15 @@ def compute_hvpo_outcome_advantage(
             algorithm configuration object
 
     Assumptions:
-        - token_level_rewards > 0  : HVC
-        - token_level_rewards < 0  : distance-based penalty
+        - token_level_rewards > 0  : HV contribution (sample expanded the front)
+        - token_level_rewards < 0  : distance-based penalty (dominated sample)
+
+    The per-sample scalar reward already encodes the multi-objective credit (the
+    exclusive hypervolume contribution produced by the HVPO reward manager), so
+    the advantage uses the same group-relative baseline as GRPO: center each
+    reward by its rollout-group mean and divide by the group std. Keeping the
+    HVPO advantage identical in form to GRPO isolates the multi-objective signal
+    to the *reward*, making HVPO-vs-vanilla a clean controlled comparison.
 
     Returns:
         advantages: `(torch.Tensor)`
@@ -367,54 +374,6 @@ def compute_hvpo_outcome_advantage(
     return compute_grpo_outcome_advantage(
         token_level_rewards, response_mask, index, epsilon, True, config
     )
-
-    scores = token_level_rewards.sum(dim=-1)
-
-    advantages = torch.zeros_like(scores)
-
-    # group indices by prompt
-    id2inds = defaultdict(list)
-    for i, idx in enumerate(index):
-        id2inds[idx].append(i)
-
-    with torch.no_grad():
-        for idx, inds in id2inds.items():
-            group_scores = scores[inds]
-
-            # -------- semantic split (BEFORE centering) --------
-            pos_mask = group_scores > 0     # HVC
-            neg_mask = group_scores < 0     # distance penalty
-
-
-        # for idx in id2score:
-        #     if len(id2score[idx]) == 1:
-        #         id2mean[idx] = torch.tensor(0.0)
-        #         id2std[idx] = torch.tensor(1.0)
-        #     elif len(id2score[idx]) > 1:
-        #         scores_tensor = torch.stack(id2score[idx])
-        #         id2mean[idx] = torch.mean(scores_tensor)
-        #         id2std[idx] = torch.std(scores_tensor)
-        #     else:
-        #         raise ValueError(f"no score in prompt index: {idx}")
-        for i in range(bsz):
-            raw_score = scores[i] - id2mean[index[i]]
-            if raw_score > 0:
-                # -------- positive advantage (HVC) --------
-                # do NOT divide by std, only center
-                adv = raw_score
-                adv = torch.clamp(adv, max=pos_clip)
-            else:
-                # -------- negative advantage (distance penalty) --------
-                # normalize & strongly clip
-                adv = raw_score / (id2std[index[i]] + epsilon)
-                adv = torch.clamp(adv, min=-neg_clip)
-            # if norm_adv_by_std_in_grpo:
-            #     scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
-            # else:
-            #     scores[i] = scores[i] - id2mean[index[i]]
-        scores = scores.unsqueeze(-1) * response_mask
-
-    return scores, scores
 
 
 @register_adv_est(AdvantageEstimator.GRPO_VECTORIZED)

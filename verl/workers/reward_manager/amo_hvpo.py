@@ -269,7 +269,8 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # ------------------------------------------------------------------
         score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)    # (batch_size, num_objectives)
 
-        # Get Pareto cache snapshot for this batch
+        # Get Pareto cache snapshot for this batch. This is the front *before*
+        # the current batch, so a sample is credited for pushing it outward.
         pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
 
         # Determine reference point for this group
@@ -280,30 +281,29 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         distance_penalty = torch.zeros(len(uids), dtype=torch.float32)
 
         assert all(split == data_splits[0] for split in data_splits), "All elements in data_splits should be the same"
-        need_estimate_pareto_front: bool = data_splits[0] != "train"
+        is_train: bool = data_splits[0] == "train"
 
-        if need_estimate_pareto_front:
-            # update pareto cache
-            pareto_cache_point = score_tensor.mean(dim=0).tolist()
-            self.pareto_cache.update(pareto_cache_point)
-            print(f"[Amo][HV] Added point {pareto_cache_point} to Pareto cache, current size: {self.pareto_cache.size()}")
-
-            # calculate reward through mean of individual scores
+        if not is_train:
+            # Validation / test: we only need an interpretable scalar for
+            # monitoring, NOT a training signal. Use the mean over objectives so
+            # the logged curve reflects overall multi-objective quality, and do
+            # NOT pollute the training Pareto front with validation points.
             hybrid_rewards = score_tensor.mean(dim=1)
-            
+
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
         for idx, uid in enumerate(uids):
             uid2indices[uid].append(idx)
-        # print(f"[Amo][HV] uid2indices: {uid2indices}")
 
         for group_uid, indices in uid2indices.items():
-            # group_size is equal to actor_rollout_ref.rollout.n for train and actor_rollout_ref.rollout.val_kwargs.n for val
+            # group_size == actor_rollout_ref.rollout.n (train) / val_kwargs.n (val)
             group_scores = score_tensor[indices]  # (group_size, dim)
             if group_scores.numel() == 0:
                 continue
 
-            # Compute HV contributions against the global Pareto cache.
+            # Exclusive HV contribution of each member within (global front ∪ group).
+            # This rewards a group for *covering* new/diverse regions of the
+            # objective space instead of piling multiple rollouts onto one spot.
             contributions = self._compute_hybrid_reward(
                 group_scores, ref_point, pareto_tensor
             )
@@ -314,12 +314,24 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             # Write rewards to the last token position and fill extra info
             for local_idx, global_idx in enumerate(indices):
                 contribution = contributions[local_idx]
-                
-                if not need_estimate_pareto_front:
+
+                if is_train:
                     hybrid_rewards[global_idx] = contribution
                 hv_contributions[global_idx] = contribution if contribution > 0 else 0.0
                 distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
-                # reference_points_per_sample[global_idx] = ref_point.tolist()
+
+        # ------------------------------------------------------------------
+        # Update the global Pareto front from *training* rollouts.
+        #
+        # This is done AFTER computing rewards (so credit is assigned against
+        # the pre-batch front) and uses the real per-sample objective vectors,
+        # keeping only the non-dominated ones. Previously the front was only
+        # updated during validation (and with the batch *mean*), which made the
+        # front effectively empty during training and degenerated the HV reward
+        # into a plain product-of-objectives signal.
+        # ------------------------------------------------------------------
+        if is_train:
+            self.pareto_cache.update(score_tensor.tolist())
 
         # ------------------------------------------------------------------
         # Debug printing (keep original behavior controlled by num_examine)
@@ -363,41 +375,44 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
     # ------------------------------------------------------------------
     # Helper methods
-    # ------------------------------------------------------------------    @staticmethod
+    # ------------------------------------------------------------------
     def _compute_hybrid_reward(
         self,
         group_vectors: torch.Tensor,
         ref_point: torch.Tensor,
         pareto_vectors: torch.Tensor,
     ) -> torch.Tensor:
-        """Hybrid reward: ΔHV or distance penalty for a batch points.
-        The calculation for a single point is given by HybridRewardModel
-        
+        """Exclusive HV contribution (with distance fallback) for a group.
+
+        Each member is credited with the volume it *uniquely* adds on top of the
+        global front and the rest of its own group::
+
+            reward_i = HV(P ∪ G) − HV(P ∪ (G \\ {v_i})).
+
+        Members that add no volume (dominated within ``P ∪ G``) receive a small
+        negative distance-to-front penalty instead, keeping a usable gradient.
+
         Args:
-            group_vectors: Objective vectors for the group.
-            ref_point: Reference point for hypervolume calculation.
-            pareto_vectors: Pareto front vectors.
-        
+            group_vectors: Objective vectors for the group, shape (G, dim).
+            ref_point: Reference point for hypervolume calculation, shape (dim,).
+            pareto_vectors: Global Pareto front snapshot, shape (K, dim).
+
         Returns:
-            Hybrid reward tensor for each point.
+            Hybrid reward tensor of shape (G,).
         """
-        group_size, dim = group_vectors.shape
+        group_size = group_vectors.shape[0]
 
-        # Compute hybrid reward for each point in the group
-        rewards = []
-        for point in group_vectors:
-            reward = HybridRewardModel.compute_hybrid_reward(
-                point, pareto_vectors, ref_point,
-                distance_metric=self.distance_metric,
-            )
-            rewards.append(reward)
-        
-        # Return tensor with rewards for each point
-        trajectory_rewards = torch.stack(rewards)
-        assert trajectory_rewards.shape == (group_size,), f"[Amo][HV] Hybrid reward shape mismatch: {trajectory_rewards.shape}"
+        trajectory_rewards = HybridRewardModel.compute_group_hybrid_rewards(
+            group_vectors,
+            pareto_vectors,
+            ref_point,
+            distance_metric=self.distance_metric,
+        )
 
+        assert trajectory_rewards.shape == (group_size,), (
+            f"[Amo][HV] Hybrid reward shape mismatch: {trajectory_rewards.shape}"
+        )
         return trajectory_rewards
-        
 
     def _compute_reference_point(self, group_scores: torch.Tensor, pareto_tensor: torch.Tensor) -> torch.Tensor:
         """Compute reference point for hypervolume calculation.
@@ -445,8 +460,6 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         """
         # Take a snapshot of the global Pareto cache for this batch
         pareto_cache_snapshot: list[list[float]] = self.pareto_cache.get_snapshot()
-        print(f"[Amo][HV] Pareto cache snapshot size: {len(pareto_cache_snapshot)}")
-        print(f"[Amo][HV] Pareto cache snapshot: {pareto_cache_snapshot}")
 
         # Prepare Pareto cache tensor for this group (if enabled)
         if len(pareto_cache_snapshot) > 0:

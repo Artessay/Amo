@@ -330,17 +330,27 @@ amo_strategy:
 
   # Hypervolume (HV) specific configuration
   hv_config:
-    # Strategy for determining the reference point: "static", "dynamic_batch", or "dynamic_datasource"
+    # Strategy for determining the reference point: "static" or "dynamic_batch".
     reference_point_strategy: static
 
-    # Static reference point for HV computation
+    # Static reference point for HV computation. `null` -> origin (all zeros),
+    # which is correct for objectives normalized to [0, 1].
     reference_point: null
 
-    # Margin to add to the reference point when using dynamic strategies
+    # Margin to subtract from the reference point when using dynamic strategies.
     reference_point_margin: 0.0
 
-    # Reward scaling mode: "min-max", "z-score", or "none"
+    # Reward scaling mode applied to the HV contributions within a group:
+    # "min-max", "z-score", "tanh" or "none".
     reward_scaling_mode: none
 
-    # distance metric
+    # Distance metric used as the fallback signal for dominated samples:
+    # "chebyshev", "euclidean" or "none".
     distance_metric: "chebyshev"
+
+    # Global Pareto-front cache. The front is updated online from training
+    # rollouts (non-dominated per-sample objective vectors); per-sample rewards
+    # are the *exclusive* HV contribution within (front ∪ rollout-group).
+    pareto_cache_max_size: 1024
+    pareto_cache_eps: 1.0e-9
+    pareto_cache_strategy: fifo

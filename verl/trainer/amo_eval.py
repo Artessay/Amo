@@ -29,6 +29,40 @@ from tqdm import tqdm
 from verl.trainer.ppo.reward import get_custom_reward_fn
 from verl.utils.fs import copy_to_local
 
+
+def compute_hypervolume(vectors, ref_point=None):
+    """Compute the dominated hypervolume of a set of objective vectors.
+
+    This is the aggregate multi-objective quality indicator used to compare
+    methods (e.g. HVPO vs. the vanilla weighted-sum baseline). A larger HV means
+    the model's objective vectors jointly dominate a larger region, i.e. a better
+    coverage of the objective space / Pareto front. Unlike per-objective means,
+    HV rewards a *balanced* trade-off across objectives rather than sacrificing
+    one objective for another.
+
+    Args:
+        vectors: list of objective vectors (each a list/tuple of floats), all of
+            the same dimension. Objectives are treated as *maximization*.
+        ref_point: reference point (list of floats). Defaults to all zeros, which
+            is appropriate for objectives normalized to [0, 1].
+
+    Returns:
+        float hypervolume value (0.0 if input is empty).
+    """
+    import torch
+
+    from verl.workers.reward_manager.amo_utils.hypervolume_calculator import HypervolumeCalculator
+
+    if len(vectors) == 0:
+        return 0.0
+    dim = len(vectors[0])
+    if ref_point is None:
+        ref_point = [0.0] * dim
+    pts = torch.tensor(vectors, dtype=torch.float64)
+    ref = torch.tensor(ref_point, dtype=torch.float64)
+    return float(HypervolumeCalculator.calculate_hypervolume(pts, ref).item())
+
+
 def avg_scores_by_fn(score_lst):
     """
     Compute average scores for each reward function across all responses.
@@ -107,9 +141,24 @@ def main(config):
 
     metric_dict = {}
     for data_source, rewards in data_source_reward.items():
-        metric_dict[data_source] = avg_scores_by_fn(rewards)
+        avg = avg_scores_by_fn(rewards)
 
-    print(metric_dict)
+        # Build per-prompt objective vectors (in a stable objective order) and
+        # compute the dominated hypervolume as the aggregate multi-objective
+        # quality indicator. Objectives are assumed to be normalized to [0, 1]
+        # (as for the UniEval news metrics), so the reference point is the origin.
+        fn_names = sorted(rewards[0].keys())
+        vectors = [[float(r[name]) for name in fn_names] for r in rewards]
+        hv = compute_hypervolume(vectors, ref_point=[0.0] * len(fn_names))
+
+        metric_dict[data_source] = {
+            **avg,
+            "mean_vector": {name: float(avg[name]) for name in fn_names},
+            "hypervolume": hv,
+            "num_prompts": len(rewards),
+        }
+
+    print(json.dumps(metric_dict, indent=4))
 
     save_path = local_path.replace(".parquet", ".json")
     with open(save_path, "w") as f:

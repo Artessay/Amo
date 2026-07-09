@@ -24,7 +24,7 @@ torch==2.8.0
 torchaudio
 torchdata
 torchvision
-transformers
+transformers>=4.57.3,<5.0
 wandb
 packaging>=20.0
 uvicorn
