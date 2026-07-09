@@ -67,6 +67,9 @@ SGLANG_REQUIRES = [
 TRL_REQUIRES = ["trl<=0.9.6"]
 MCORE_REQUIRES = ["mbridge"]
 TRANSFERQUEUE_REQUIRES = ["TransferQueue @ git+https://github.com/TransferQueue/TransferQueue.git@68c04e7"]
+# Synthetic multi-objective optimization benchmark suite (ZDT/DTLZ/WFG problems,
+# reference algorithms and HV/IGD indicators) used by playground/benchmarks.
+MOO_REQUIRES = ["pymoo==0.6.2", "matplotlib"]
 
 extras_require = {
     "test": TEST_REQUIRES,
@@ -79,6 +82,7 @@ extras_require = {
     "trl": TRL_REQUIRES,
     "mcore": MCORE_REQUIRES,
     "transferqueue": TRANSFERQUEUE_REQUIRES,
+    "moo": MOO_REQUIRES,
 }
 
 
