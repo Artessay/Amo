@@ -36,6 +36,10 @@ class AccustomedQwen2Model(Qwen2ForCausalLM):
 class AccustomedQwen2RewardModel(Qwen2PreTrainedModel):
 
     supports_gradient_checkpointing = True
+    # transformers>=5 sets `all_tied_weights_keys` during post_init(); this custom
+    # class skips post_init, so provide the default explicitly. A score/reward model
+    # has no tied weights (score_head is independent), so an empty mapping is correct.
+    all_tied_weights_keys: dict = {}
 
     def __init__(self, config: AutoConfig):
         super().__init__(config)
