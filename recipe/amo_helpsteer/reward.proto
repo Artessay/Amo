@@ -1,0 +1,21 @@
+syntax = "proto3";
+package recipe.amo_helpsteer;
+
+// Multi-attribute HelpSteer2 reward service backed by ArmoRM-Llama3-8B-v0.1.
+service HelpSteerRewardService {
+  rpc ComputeScore (ScoreRequest) returns (ScoreResponse) {}
+}
+
+message ScoreRequest {
+  string prompt = 1;
+  string response = 2;
+}
+
+// The five HelpSteer2 attribute rewards produced by ArmoRM.
+message ScoreResponse {
+  double helpfulness = 1;
+  double correctness = 2;
+  double coherence = 3;
+  double complexity = 4;
+  double verbosity = 5;
+}
