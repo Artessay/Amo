@@ -41,3 +41,37 @@ safe 1.5b hvpo 2步小 batch: 全链路跑通, 零真错误。日志见 /tmp/amo
 - [ ] 跑 safe: 1.5b/3b × grpo/hvpo (4 run)
 - [ ] 跑 news: 1.5b/3b × grpo/hvpo (4 run)
 - [ ] 评测 + HV 对比表 + Pareto 图 + 分析
+
+## 稳定训练配置 (2026-07 调通)
+- GPU: 训练与奖励模型同卡 GPU 0,1 (TRAIN_GPUS=0,1, run_exp.sh 默认)
+- 关键内存安全设置 (避免 OOM, 与 vLLM 共存):
+  - actor_rollout_ref.rollout.gpu_memory_utilization=0.35
+  - ppo/log_prob/ref micro_batch_size_per_gpu=4
+  - 不要用 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (与 vLLM mem pool 冲突)
+- 快速验证: data.train_batch_size=64, ppo_mini_batch_size=32, 50 步 ~= 1.5-2h
+  - 单步时间随 batch 缩放; 跑满 1 epoch 与 batch 无关(总量固定, ~40h@2卡)
+- trainer.val_before_train=False (跳过昂贵的 8211 全量预验证)
+- data.val_files=test_small.parquet (200 子集, 周期验证快)
+- SAVE_FREQ=25 -> checkpoint 存 checkpoints/amo_pku-saferlhf/qwen2.5-1.5b_grpo/global_step_N
+  - resume_mode=auto 可自动续训到完整 epoch (checkpoint 可复用)
+- 公平对比: GRPO 与 HVPO 用完全相同的步数/batch, 仅 adv_estimator + reward_manager 不同
+
+## GRPO run (进行中)
+log: /tmp/amo_reward_logs/run_safe_1.5b_grpo.log
+
+## GRPO run 完成 (2026-07-10)
+- 50 步, batch 64, GPU 0,1。checkpoint: global_step_25, global_step_50 (可复用续训)
+- critic/score/mean: 3.0 (start) -> 4.79 (step50), +60% (GRPO 优化加权和奖励, 符合预期)
+- 用时约 1h15m (~87s/step compute + reward scoring overhead)
+- log: /tmp/amo_reward_logs/run_safe_1.5b_grpo.log
+
+## HVPO run 启动 (相同配置, 仅 adv_estimator=hvpo + reward_manager=amo_hvpo)
+- log: /tmp/amo_reward_logs/run_safe_1.5b_hvpo.log
+
+## 评测流水线 (scripts/amo_exp/eval_pipeline.sh)
+- merge LoRA -> generate(GPU2,3) -> amo_eval(HV, ref=origin) + 各维均值
+- GRPO step50 已 merge 成功: checkpoints/.../qwen2.5-1.5b_grpo/global_step_50/actor/merge
+- 注意: 不要在训练(vLLM占卡)时跑 generation(另一个vLLM), 会 shm 冲突挂起!
+  评测必须等 HVPO 训练完成、释放 GPU 后再做。
+- 注意: safe 奖励分不在[0,1](约-3~+6), amo_eval 用 ref=origin 算 HV 会 clamp 负值;
+  分析时需对两方法用相同参考点(取全体最小值以下)重算 HV 才公平。

@@ -25,8 +25,8 @@ fi
 # amo 环境的 python (base 环境没有 numpy/verl 依赖)
 PY=/home/rihongqiu/data/miniconda3/envs/amo/bin/python
 
-# --- 硬锁定 GPU 2,3 ---
-export CUDA_VISIBLE_DEVICES=2,3
+# --- GPU 分配: 训练与奖励模型同卡 (GPU 0,1). 可用 TRAIN_GPUS 覆盖 ---
+export CUDA_VISIBLE_DEVICES=${TRAIN_GPUS:-0,1}
 
 WORKSPACE=$(dirname "$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")")
 echo "Using workspace: $WORKSPACE"
@@ -119,7 +119,7 @@ $PY -m verl.trainer.main_ppo \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
-    trainer.save_freq=-1 \
-    trainer.test_freq=10 \
+    trainer.save_freq=${SAVE_FREQ:-20} \
+    trainer.test_freq=${TEST_FREQ:-10} \
     trainer.total_epochs=$EPOCH \
     $STEP_ARG "$@"
