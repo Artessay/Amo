@@ -47,7 +47,7 @@ install_requires = [
     "torchdata",
     "torchvision",
     "tensordict>=0.8.0,<=0.10.0,!=0.9.0",
-    "transformers",
+    "transformers>=4.57.3,<5.0",
     "wandb",
     "packaging>=20.0",
     "tensorboard",
