@@ -22,6 +22,14 @@ from .prime import PrimeRewardManager
 from .amo_vanilla import AmoVanillaRewardManager
 from .amo_hvpo import AmoHvpoRewardManager
 
+# [Amo] multi-objective baseline reward managers (LS/Tchebycheff, adaptive,
+# Pareto-credit). Importing the subpackage triggers their @register(...) hooks.
+from .amo_baselines import (
+    AmoScalarizeRewardManager,
+    AmoAdaptiveRewardManager,
+    AmoParetoRewardManager,
+)
+
 # Note(haibin.lin): no need to include all reward managers here in case of complicated dependencies
 __all__ = [
     "BatchRewardManager",
@@ -32,7 +40,10 @@ __all__ = [
     "get_reward_manager_cls",
 
     "AmoVanillaRewardManager",
-    "AmoHvpoRewardManager"
+    "AmoHvpoRewardManager",
+    "AmoScalarizeRewardManager",
+    "AmoAdaptiveRewardManager",
+    "AmoParetoRewardManager",
 ]
 
 # Import experimental reward managers to ensure they are registered

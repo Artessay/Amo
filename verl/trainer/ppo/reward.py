@@ -193,6 +193,22 @@ def load_reward_manager(
             hv_config = amo_strategy_cfg.get("hv_config", {})
             reward_kwargs.setdefault("hv_config", hv_config)
 
+    # [Amo] Prepare config blocks for the multi-objective baseline reward
+    # managers. Each baseline manager reads exactly one block; passing the block
+    # keyed by the selected reward manager keeps the wiring uniform with hv_config
+    # above and avoids leaking unrelated kwargs into a manager's __init__.
+    amo_strategy_cfg = config.get("amo_strategy")
+    if amo_strategy_cfg is not None:
+        _reward_manager_name = getattr(reward_manager_cfg, "name", None)
+        _baseline_config_key = {
+            "amo_scalarize": "scalarize_config",
+            "amo_adaptive": "adaptive_config",
+            "amo_pareto": "pareto_config",
+        }.get(_reward_manager_name)
+        if _baseline_config_key is not None:
+            _block = amo_strategy_cfg.get(_baseline_config_key, {})
+            reward_kwargs.setdefault(_baseline_config_key, _block)
+
     # Instantiate and return the reward manager with the specified parameters
     # RewardLoopManagerBase subclasses (like RateLimitedRewardLoopManager) don't accept num_examine
     # while AbstractRewardManager subclasses (like NaiveRewardManager) do

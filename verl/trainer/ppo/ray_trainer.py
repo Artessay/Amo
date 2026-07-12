@@ -61,6 +61,28 @@ from verl.utils.torch_functional import masked_mean, masked_whiten
 from verl.utils.tracking import ValidationGenerationsLogger
 
 
+# [Amo] Advantage estimators that consume the *per-objective* token-level score
+# tensors (token_level_scores_<objective>) emitted by the Amo multi-objective
+# reward managers, rather than a single pre-scalarized reward. GDPO and every
+# GDPO-family baseline (weighted GDPO, RVPO) plus the advantage-space gradient
+# aggregation baselines (MGDA, GAPO) belong here.
+AMO_PER_OBJECTIVE_ADV_ESTIMATORS = frozenset(
+    {
+        AdvantageEstimator.GDPO.value,
+        AdvantageEstimator.GDPO_WEIGHTED.value,
+        AdvantageEstimator.RVPO.value,
+        AdvantageEstimator.MGDA.value,
+        AdvantageEstimator.GAPO.value,
+    }
+)
+
+
+def _needs_per_objective_scores(adv_estimator) -> bool:
+    """True if the estimator needs the per-objective token_level_scores_dict."""
+    value = adv_estimator.value if hasattr(adv_estimator, "value") else adv_estimator
+    return value in AMO_PER_OBJECTIVE_ADV_ESTIMATORS
+
+
 @dataclass
 class ResourcePoolManager:
     """
@@ -246,13 +268,13 @@ def compute_advantage(
         # Get all reward keys that start with "token_level_scores_"
         reward_keys = [key for key in data.batch.keys() if key.startswith("token_level_scores_")]
         assert len(reward_keys) > 0, "No token_level_scores_* keys found in data.batch"
-        
+
         # Calculate advantage for each reward function
         advantage_score_list = []
         for reward_key in reward_keys:
             # Get the token-level scores for this reward type
             token_level_scores = data.batch[reward_key]
-            
+
             # Call compute_grpo_outcome_advantage for this reward type
             normalized_score, _ = core_algos.compute_grpo_outcome_advantage(
                 token_level_rewards=token_level_scores,
@@ -260,18 +282,59 @@ def compute_advantage(
                 index=data.non_tensor_batch["uid"],
                 norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
             )
-            
+
             advantage_score_list.append(normalized_score)
-        
+
         # Sum all normalized scores to get the final advantage score
         advantage_score = sum(advantage_score_list)
-        
+
         # Apply masked_whiten to normalize the advantage score
         advantages = masked_whiten(advantage_score, response_mask) * response_mask
-        
+
         # In GDPO, returns are the same as advantages
         data.batch["advantages"] = advantages
         data.batch["returns"] = advantages
+    elif adv_estimator in (
+        AdvantageEstimator.GDPO_WEIGHTED,
+        AdvantageEstimator.RVPO,
+        AdvantageEstimator.MGDA,
+        AdvantageEstimator.GAPO,
+    ):
+        # [Amo] multi-objective baselines operating on the per-objective
+        # token_level_scores_<objective> tensors. Sorting the keys keeps a stable
+        # objective ordering so weight vectors line up with the reward functions.
+        from verl.trainer.ppo import amo_mo_advantages as amo_adv
+
+        response_mask = data.batch["response_mask"]
+        reward_keys = sorted(k for k in data.batch.keys() if k.startswith("token_level_scores_"))
+        assert len(reward_keys) > 0, (
+            "No token_level_scores_* keys found; this estimator requires an Amo "
+            "multi-objective reward manager that emits token_level_scores_dict."
+        )
+        token_level_scores_list = [data.batch[k] for k in reward_keys]
+        index = data.non_tensor_batch["uid"]
+        weights = config.get("amo_objective_weights", None) if config is not None else None
+
+        if adv_estimator == AdvantageEstimator.GDPO_WEIGHTED:
+            advantages, returns = amo_adv.compute_gdpo_weighted_advantage(
+                token_level_scores_list, response_mask, index, weights, norm_adv_by_std_in_grpo
+            )
+        elif adv_estimator == AdvantageEstimator.RVPO:
+            k = config.get("rvpo_k", 1.0) if config is not None else 1.0
+            advantages, returns = amo_adv.compute_rvpo_advantage(
+                token_level_scores_list, response_mask, index, k, norm_adv_by_std_in_grpo
+            )
+        elif adv_estimator == AdvantageEstimator.MGDA:
+            advantages, returns = amo_adv.compute_mgda_advantage(
+                token_level_scores_list, response_mask, index, weights, None, norm_adv_by_std_in_grpo
+            )
+        else:  # GAPO
+            gapo_p = config.get("gapo_p", 1.0) if config is not None else 1.0
+            advantages, returns = amo_adv.compute_mgda_advantage(
+                token_level_scores_list, response_mask, index, weights, gapo_p, norm_adv_by_std_in_grpo
+            )
+        data.batch["advantages"] = advantages
+        data.batch["returns"] = returns
     else:
         # handle all other adv estimator type other than GAE and GRPO
         adv_estimator_fn = core_algos.get_adv_estimator_fn(adv_estimator)
@@ -1168,7 +1231,7 @@ class RayPPOTrainer:
                                 reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
                                 
                                 # [gdpo] Handle token level scores dict for sync case
-                                if self.config.algorithm.adv_estimator == AdvantageEstimator.GDPO:
+                                if _needs_per_objective_scores(self.config.algorithm.adv_estimator):
                                     token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
                                     for reward_fn_name, token_level_scores in token_level_scores_dict.items():
                                         batch.batch[f"token_level_scores_{reward_fn_name}"] = token_level_scores
@@ -1242,7 +1305,7 @@ class RayPPOTrainer:
                                 reward_extra_infos_dict = reward_result.get("reward_extra_info", {})
 
                                 # [gdpo] Handle token level scores dict
-                                if self.config.algorithm.adv_estimator == AdvantageEstimator.GDPO:
+                                if _needs_per_objective_scores(self.config.algorithm.adv_estimator):
                                     # get token level scores dict
                                     token_level_scores_dict = reward_result.get("token_level_scores_dict", {})
                                     # Save each token_level_scores to batch

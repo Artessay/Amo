@@ -98,6 +98,13 @@ class AdvantageEstimator(str, Enum):
     GRPO = "grpo"
     GDPO = "gdpo"
     HVPO = "hvpo"
+    # [Amo] multi-objective baselines operating on per-objective token-level
+    # scores (require an Amo multi-objective reward manager that emits
+    # token_level_scores_dict).
+    GDPO_WEIGHTED = "gdpo_weighted"  # weighted GDPO (per-objective weight sweep)
+    RVPO = "rvpo"  # reward-variance policy optimization (soft-min over objectives)
+    MGDA = "mgda"  # min-norm advantage aggregation (MGDA, advantage-space proxy)
+    GAPO = "gapo"  # gradient-norm rescaled MGDA (GAPO, advantage-space proxy)
     REINFORCE_PLUS_PLUS = "reinforce_plus_plus"
     REINFORCE_PLUS_PLUS_BASELINE = "reinforce_plus_plus_baseline"
     REMAX = "remax"

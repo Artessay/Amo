@@ -119,6 +119,16 @@ algorithm:
     # Power used for weight scaling in "pow" method
     weight_pow: 2.0
 
+  # [Amo] Per-objective weights for multi-objective baseline advantage
+  # estimators (gdpo_weighted, rvpo, mgda, gapo). null -> uniform.
+  amo_objective_weights: null
+
+  # [Amo] RVPO soft-min temperature. 0 -> GDPO mean; large -> worst objective.
+  rvpo_k: 1.0
+
+  # [Amo] GAPO gradient-norm rescale exponent p.
+  gapo_p: 1.0
+
 # config for the trainer
 trainer:
 
@@ -354,3 +364,68 @@ amo_strategy:
     pareto_cache_max_size: 1024
     pareto_cache_eps: 1.0e-9
     pareto_cache_strategy: fifo
+
+  # ------------------------------------------------------------------
+  # [Amo] Multi-objective BASELINE reward managers (for comparison with HVPO).
+  # Each block is consumed only by its matching reward_model.reward_manager.
+  # All baselines keep the same rollout/KL/token budget; only the multi-objective
+  # credit differs. See verl/workers/reward_manager/amo_baselines/.
+  # ------------------------------------------------------------------
+
+  # amo_scalarize: fixed linear (MORLHF) or (augmented) Tchebycheff scalarization.
+  # Advantage estimator should be `grpo`.
+  scalarize_config:
+    # "linear" (weighted sum) or "tchebycheff".
+    method: linear
+    # Objective weights on the simplex. null -> uniform. Length must equal the
+    # number of reward functions. Sweep this for the LS/MORLHF Pareto front.
+    weights: null
+    # Optional per-objective affine calibration: "none" or "affine".
+    normalize: none
+    # Affine calibration bounds (only used when normalize=affine). Must come from
+    # a frozen calibration split and be shared across all methods.
+    calib_lower: null
+    calib_upper: null
+    # Tchebycheff ideal/utopia point. null -> all-ones (objectives in [0,1]).
+    ideal: null
+    # Augmented-Tchebycheff coefficient rho (>=0); small value breaks ties.
+    rho: 0.0
+
+  # amo_adaptive: adaptive-weight / constrained baselines that hold state across
+  # steps. Advantage estimator should be `grpo`.
+  adaptive_config:
+    # "lagrangian" | "fair_stable" | "ctwa" | "dynamic_hv".
+    method: lagrangian
+    # --- Lagrangian (Safe-RLHF style) ---
+    # Index of the objective to maximize; the rest are treated as constraints.
+    primary_index: 0
+    # Per-objective budgets d_c (constraint entries only). null -> zeros.
+    budgets: null
+    lambda_lr: 0.05
+    lambda_init: 0.0
+    lambda_max: 10.0
+    # --- Fair-and-Stable / CTWA / dynamic_hv shared weight state ---
+    weights: null
+    weight_lr: 0.1
+    weight_floor: 1.0e-3
+    update_window: 1
+    ema_decay: 0.9
+    # --- CTWA ---
+    cov_tau: 0.1
+    cov_targets: null
+    # --- dynamic_hv (HV-guided group-level weighting) ---
+    hv_buffer_size: 256
+    hv_eps: 1.0e-9
+    hv_reference_point: null
+
+  # amo_pareto: NSGA-II-style (rank + crowding) or SMS-EMOA-style (exclusive HV)
+  # response credit. Advantage estimator should be `grpo`.
+  pareto_config:
+    # "nsga2" or "smsemoa".
+    method: nsga2
+    # NSGA-II crowding weighting and finite value used for boundary (inf) points.
+    crowding_coef: 1.0
+    crowding_inf: 2.0
+    # SMS-EMOA HV reference point (null -> per-group min) and distance fallback.
+    hv_reference_point: null
+    distance_metric: chebyshev

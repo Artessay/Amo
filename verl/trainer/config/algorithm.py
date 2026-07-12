@@ -461,3 +461,14 @@ class AlgoConfig(BaseConfig):
     # Rollout Correction: corrects off-policy issues (policy mismatch, model staleness, distribution shifts)
     # Set to None to disable, use RolloutCorrectionConfig presets (e.g., .tis(), .mis()), or pass dict
     rollout_correction: Optional[RolloutCorrectionConfig] = None
+
+    # [Amo] Hyperparameters for the multi-objective baseline advantage estimators
+    # (gdpo_weighted, rvpo, mgda, gapo). These operate on the per-objective
+    # token_level_scores_* tensors emitted by the Amo reward managers.
+    #
+    # gdpo_weighted / mgda / gapo / rvpo: per-objective weights (null -> uniform).
+    amo_objective_weights: Optional[list] = None
+    # rvpo: soft-min temperature k. k->0 recovers GDPO (mean); k->inf -> worst objective.
+    rvpo_k: float = 1.0
+    # gapo: gradient-norm rescale exponent p (bar g_j = g_j / ||g_j||^p).
+    gapo_p: float = 1.0
