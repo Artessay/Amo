@@ -46,8 +46,10 @@ case "$MODEL" in
 esac
 
 PROJECT_NAME="amo_math-lighteval"
-TRAIN_FILES="$WORKSPACE/data/MATH-lighteval/train.parquet"
-VAL_FILES="$WORKSPACE/data/MATH-lighteval/val.parquet"
+# NOTE: directory is MATH-LightEval (train.parquet + test.parquet; no val split).
+# We use test.parquet as the validation file, matching the other Amo tasks.
+TRAIN_FILES="$WORKSPACE/data/MATH-LightEval/train.parquet"
+VAL_FILES="$WORKSPACE/data/MATH-LightEval/test.parquet"
 REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
 # --- Map METHOD -> (adv_estimator, reward_manager, method-specific overrides) ---

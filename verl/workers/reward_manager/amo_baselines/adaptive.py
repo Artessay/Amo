@@ -133,6 +133,24 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
 
         print(f"[Amo][adaptive] method={self.method} config={cfg}")
 
+        # Throttle scalar-state printing so long runs are not spammed.
+        self._log_every: int = int(cfg.get("log_every", 10))
+        self._log_calls: int = 0
+
+    # ------------------------------------------------------------------
+    def _log_state(self, state: dict) -> None:
+        """Print evolving scalar state (duals / weights / buffer size).
+
+        These are per-manager scalars, NOT per-sample values, so they must never
+        be injected into ``reward_extra_info`` (that dict becomes the per-sample
+        ``non_tensor_batch``, where every key must have length == batch size).
+        We simply print them, throttled by ``log_every``.
+        """
+        self._log_calls += 1
+        if self._log_every > 0 and (self._log_calls % self._log_every == 1 or self._log_every == 1):
+            pretty = " ".join(f"{k}={v:.4f}" for k, v in state.items())
+            print(f"[Amo][adaptive][{self.method}] {pretty}")
+
     # ------------------------------------------------------------------
     def _compute_scalar_rewards(
         self,
@@ -155,6 +173,7 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
     def _lagrangian(self, scores: torch.Tensor, is_train: bool, extra: dict) -> torch.Tensor:
         m = self.num_obj
         p = self.primary_index
+        n = scores.shape[0]
         lam = self._lambdas.to(scores.dtype)
         # reward = r_primary - sum_{c != p} lambda_c * (d_c - r_c)
         # (d_c - r_c) > 0 means the constraint is violated -> penalize.
@@ -182,8 +201,10 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
                         )
                     )
                 self._lambdas = new_lam
-                for c in range(m):
-                    extra["reward_extra_info"].setdefault(f"lambda_{c}", [])
+                # Log the current dual variables (scalar state -> printed, not
+                # injected into the per-sample non_tensor_batch, which must keep
+                # every key aligned to batch size).
+                self._log_state({f"lambda_{c}": self._lambdas[c].item() for c in range(m)})
         return reward
 
     # ------------------------------------------------------------------
@@ -211,8 +232,7 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
                     new_w = torch.softmax(log_w, dim=0)
                     new_w = new_w.clamp_min(self.weight_floor)
                     self._weights = new_w / new_w.sum()
-                for c in range(self.num_obj):
-                    extra["reward_extra_info"].setdefault(f"weight_{c}", [])
+                self._log_state({f"weight_{c}": self._weights[c].item() for c in range(self.num_obj)})
         return reward
 
     # ------------------------------------------------------------------
@@ -243,9 +263,9 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
                 self._log_weights = self._log_weights + self.weight_lr * delta
                 new_w = torch.softmax(self._log_weights, dim=0).clamp_min(self.weight_floor)
                 self._weights = new_w / new_w.sum()
-                for c in range(self.num_obj):
-                    extra["reward_extra_info"].setdefault(f"ctwa_cov_{c}", [])
-                    extra["reward_extra_info"].setdefault(f"ctwa_weight_{c}", [])
+                state = {f"ctwa_cov_{c}": self._ema_cov[c].item() for c in range(self.num_obj)}
+                state.update({f"ctwa_weight_{c}": self._weights[c].item() for c in range(self.num_obj)})
+                self._log_state(state)
         return reward
 
     # ------------------------------------------------------------------
@@ -285,5 +305,5 @@ class AmoAdaptiveRewardManager(AmoBaselineRewardManager):
                 reward.index_copy_(0, idx, base.index_select(0, idx) * scale)
             if group_means:
                 self._hv_cache.update(torch.cat(group_means, dim=0).tolist())
-            extra["reward_extra_info"].setdefault("dynamic_hv_buffer_size", [])
+            self._log_state({"dynamic_hv_buffer_size": float(self._hv_cache.size())})
         return reward
