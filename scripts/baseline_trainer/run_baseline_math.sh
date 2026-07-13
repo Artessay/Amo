@@ -162,5 +162,5 @@ $PY -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=$NUM_GPUS_PER_NODE \
     trainer.nnodes=$NUM_NODES \
     trainer.save_freq=10 \
-    trainer.test_freq=5 \
+    trainer.test_freq=10 \
     trainer.total_epochs=$EPOCH "$@"
