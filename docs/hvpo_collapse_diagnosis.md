@@ -72,6 +72,20 @@
 
 **下一步**：P1（reward_scaling_mode=z-score + dynamic_batch 参考点 margin）→ 1.5B LLM 训练验证（任务待定）。
 
+## P1 已评估并**跳过**（2026-07）
+
+原始 P1 表述在当前 HVPO 架构下**站不住脚**，且 moo_suite **无法验证**，故跳过，直接用纯 P0 上 LLM 验证。理由（均经代码验证）：
+
+1. **`reward_scaling_mode=z-score` 是恒等变换**。`_scale_contributions` 按 group(uid) 做 z-score，而 HVPO 的 advantage 复用 GRPO，也按同一 group(uid) 做 `(r-mean)/std`。同一分组上，后者会把前者完全抵消——实测 `z-score→advantage` 与 `直接 advantage` 结果逐元素相等（`torch.allclose == True`）。z-score 只有在 advantage **不**做组标准化（Dr.GRPO 式 `norm_adv_by_std=False`）时才有意义。
+
+2. **`dynamic_batch + margin` 想解决的"每组至少有正 HV 体积"，P0 已解决**。`_compute_reference_point` 里 `ref = min(ref, group_min)` 已保证参考点被组内所有点支配 → 每组正 HV 体积恒成立。suite 的 `bound = F.max + 0.1*span` 是同一思想的另一实现；P0 用"归一化 [0,1] + 固定原点"达成了等价的尺度可比。
+
+3. **suite 测不出 P1**。P1 两条都是 RL 信号层的东西（scaling 进 advantage、margin 影响 HV 绝对值）。suite 是 GA 的确定性选择，只看 HV 增益的**相对排序**：不经过 advantage 归一化（测不出 z-score 抵消），margin 平移不改排序（测不出 margin）。
+
+**结论**：跳过 P1。以后若要放大信号，正确的杠杆是"让 advantage 不做组标准化（Dr.GRPO 式）以保留组内 HV 量级"，而非 z-score scaling——这是 advantage 层的改动，需 LLM 验证，非当前优先级。
+
+**当前验证计划**：纯 P0（intra_group + 归一化）vs GRPO，1.5B 模型，单一变量对照。
+
 **重要提醒（任务天花板，独立于本次修复）**：PKU-SafeRLHF 两目标 trade-off 很弱（Pearson r≈0.79，冲突样本仅 0.7%），Pareto 前沿接近退化成一个点。对齐修复能让 HVPO 恢复成"真正有效的多目标方法"，但**能否在 PKU 上超过线性加权 GRPO 不作保证**——强 trade-off 任务（MATH accuracy↔conciseness、News 4 目标）才是 HVPO 真正的用武之地。
 
 ## 代码去向
