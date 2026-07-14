@@ -358,9 +358,25 @@ amo_strategy:
     # "chebyshev", "euclidean" or "none".
     distance_metric: "chebyshev"
 
-    # Global Pareto-front cache. The front is updated online from training
-    # rollouts (non-dominated per-sample objective vectors); per-sample rewards
-    # are the *exclusive* HV contribution within (front ∪ rollout-group).
+    # [P0] Scope of the background Pareto front P for the exclusive-HV credit
+    # assignment (reward_i = HV(P ∪ G) − HV(P ∪ (G\{i}))):
+    #   * "intra_group"   (default): P = ∅; contribution computed within each
+    #     rollout group. Mirrors the validated moo_suite HVPOSurvival and avoids
+    #     the reward collapse caused by an inflated persistent front.
+    #   * "recent_window": P = small, bounded, periodically-cleared recent front.
+    #   * "global_cache" : legacy large persistent front (ablation only; known to
+    #     collapse the signal). See docs/hvpo_collapse_diagnosis.md.
+    pareto_front_scope: intra_group
+
+    # Normalize objectives to ~[0, 1] with a running min/max before HV, so
+    # the HV scale is comparable across steps and the origin reference point is
+    # meaningful (raw reward-model logits have an unknown, drifting range).
+    normalize_objectives: True
+
+    # Global Pareto-front cache. Only used when pareto_front_scope is
+    # "recent_window" or "global_cache". The front is updated online from
+    # training rollouts (non-dominated per-sample objective vectors); per-sample
+    # rewards are the *exclusive* HV contribution within (front ∪ rollout-group).
     pareto_cache_max_size: 1024
     pareto_cache_eps: 1.0e-9
     pareto_cache_strategy: fifo

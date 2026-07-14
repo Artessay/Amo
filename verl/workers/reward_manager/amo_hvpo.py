@@ -88,6 +88,37 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         self.distance_metric: str = hv_config.get("distance_metric", "chebyshev")
         assert self.distance_metric in ["chebyshev", "euclidean", "none"]
 
+        # [P0] Pareto-front scope for the exclusive-HV credit assignment.
+        #
+        # The exclusive HV contribution of each rollout is measured against a
+        # background front P: reward_i = HV(P ∪ G) − HV(P ∪ (G \\ {i})). The
+        # choice of P is the single most important design decision and was the
+        # cause of the earlier "reward collapse":
+        #
+        # * "intra_group"  (default): P = ∅. The contribution is computed purely
+        #   within each rollout group, so a group is always able to tell *which*
+        #   of its members expand its own Pareto front. This mirrors the
+        #   validated ``HVPOSurvival`` in ``playground/benchmarks/moo_suite.py``
+        #   (exclusive HV within the current population, no accumulating archive)
+        #   and avoids the collapse where an inflated global front drives every
+        #   ΔHV to zero. See ``docs/hvpo_collapse_diagnosis.md``.
+        # * "recent_window": P = a small, bounded, periodically-cleared front of
+        #   recent training points (adds mild cross-prompt diversity pressure).
+        # * "global_cache": legacy behaviour (large persistent front). Kept for
+        #   ablation only; known to collapse the signal at large cache sizes.
+        self.pareto_front_scope: str = hv_config.get("pareto_front_scope", "intra_group")
+        assert self.pareto_front_scope in ["intra_group", "recent_window", "global_cache"], (
+            f"[Amo][HV] Unsupported pareto_front_scope: {self.pareto_front_scope}"
+        )
+
+        # [P0] Normalize objective vectors to ~[0, 1] before HV so the HV scale
+        # is comparable across steps and the fixed origin reference point is
+        # meaningful (raw reward-model logits have an unknown, drifting range).
+        # Running min/max is updated online from training rollouts.
+        self.normalize_objectives: bool = bool(hv_config.get("normalize_objectives", True))
+        self._obj_min: torch.Tensor | None = None
+        self._obj_max: torch.Tensor | None = None
+
         self._configure_reference_point()
         self._configure_pareto_cache()
         
@@ -149,6 +180,41 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             eps=self.pareto_cache_eps,
             strategy=self.pareto_cache_strategy
         )
+
+    # ------------------------------------------------------------------
+    # [P0] Objective normalization
+    # ------------------------------------------------------------------
+    def _update_objective_stats(self, raw_scores: torch.Tensor) -> None:
+        """Update the running per-objective min/max from training rollouts.
+
+        Reward-model scores have an unknown, drifting range; tracking the
+        observed min/max lets us map objectives into ~[0, 1] so the HV scale is
+        comparable across steps and the fixed origin reference point is valid.
+        """
+        if raw_scores.numel() == 0:
+            return
+        batch_min = raw_scores.min(dim=0).values
+        batch_max = raw_scores.max(dim=0).values
+        if self._obj_min is None:
+            self._obj_min = batch_min.clone()
+            self._obj_max = batch_max.clone()
+        else:
+            self._obj_min = torch.minimum(self._obj_min, batch_min)
+            self._obj_max = torch.maximum(self._obj_max, batch_max)
+
+    def _normalize_scores(self, raw_scores: torch.Tensor) -> torch.Tensor:
+        """Map raw objective scores into ~[0, 1] using the running min/max.
+
+        Falls back to the raw scores when normalization is disabled or no stats
+        have been collected yet (e.g. validation before any training step).
+        """
+        if not self.normalize_objectives or self._obj_min is None:
+            return raw_scores
+        span = (self._obj_max - self._obj_min).clamp_min(1e-8)
+        normed = (raw_scores - self._obj_min) / span
+        # Clamp so validation points outside the observed training range do not
+        # produce out-of-[0,1] objectives that distort the HV geometry.
+        return normed.clamp(0.0, 1.0)
 
     # ------------------------------------------------------------------
     # Public API
@@ -267,11 +333,26 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
         # ------------------------------------------------------------------
         # HV computation
         # ------------------------------------------------------------------
-        score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)    # (batch_size, num_objectives)
+        raw_score_tensor = torch.tensor(individual_scores_list, dtype=torch.float32)  # (batch_size, num_objectives)
 
-        # Get Pareto cache snapshot for this batch. This is the front *before*
-        # the current batch, so a sample is credited for pushing it outward.
-        pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
+        is_train_early: bool = data_splits[0] == "train"
+
+        # [P0] Normalize objectives to ~[0, 1] so the HV scale is comparable
+        # across steps and the fixed origin reference point is meaningful. The
+        # running min/max is only *updated* from training rollouts (validation
+        # points never move the normalization statistics).
+        if self.normalize_objectives and is_train_early:
+            self._update_objective_stats(raw_score_tensor)
+        score_tensor = self._normalize_scores(raw_score_tensor)
+
+        # [P0] Background Pareto front P for the exclusive-HV credit assignment,
+        # selected by ``pareto_front_scope``:
+        #   * intra_group  -> P = ∅ (contribution computed within each group);
+        #   * recent_window / global_cache -> P = snapshot of the (bounded) front.
+        if self.pareto_front_scope == "intra_group":
+            pareto_tensor = score_tensor.new_zeros((0, score_tensor.shape[1]))
+        else:
+            pareto_tensor = self._get_pareto_cache_snapshot(score_tensor)
 
         # Determine reference point for this group
         ref_point = self._compute_reference_point(score_tensor, pareto_tensor)
@@ -285,10 +366,11 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
 
         if not is_train:
             # Validation / test: we only need an interpretable scalar for
-            # monitoring, NOT a training signal. Use the mean over objectives so
-            # the logged curve reflects overall multi-objective quality, and do
-            # NOT pollute the training Pareto front with validation points.
-            hybrid_rewards = score_tensor.mean(dim=1)
+            # monitoring, NOT a training signal. Use the mean over the *raw*
+            # objectives (not the normalized ones) so the logged curve stays on
+            # the same scale as the reward-model scores and is directly
+            # comparable to the GRPO baseline's val-core/reward.
+            hybrid_rewards = raw_score_tensor.mean(dim=1)
 
         # Group indices by uid
         uid2indices: dict[str, list[int]] = defaultdict(list)
@@ -301,9 +383,10 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
             if group_scores.numel() == 0:
                 continue
 
-            # Exclusive HV contribution of each member within (global front ∪ group).
-            # This rewards a group for *covering* new/diverse regions of the
-            # objective space instead of piling multiple rollouts onto one spot.
+            # Exclusive HV contribution of each member within (front ∪ group).
+            # With the default intra_group scope the front is empty, so this
+            # rewards a group for *covering* diverse regions of its own objective
+            # space instead of piling multiple rollouts onto one spot.
             contributions = self._compute_hybrid_reward(
                 group_scores, ref_point, pareto_tensor
             )
@@ -321,16 +404,14 @@ class AmoHvpoRewardManager(AmoVanillaRewardManager):
                 distance_penalty[global_idx] = contribution if contribution < 0 else 0.0
 
         # ------------------------------------------------------------------
-        # Update the global Pareto front from *training* rollouts.
+        # Update the recent-window / legacy front from *training* rollouts.
         #
-        # This is done AFTER computing rewards (so credit is assigned against
-        # the pre-batch front) and uses the real per-sample objective vectors,
-        # keeping only the non-dominated ones. Previously the front was only
-        # updated during validation (and with the batch *mean*), which made the
-        # front effectively empty during training and degenerated the HV reward
-        # into a plain product-of-objectives signal.
+        # Done AFTER computing rewards (so credit is assigned against the
+        # pre-batch front). For the default intra_group scope the front is
+        # unused, so we skip the update entirely and never let a persistent
+        # front inflate (the root cause of the earlier reward collapse).
         # ------------------------------------------------------------------
-        if is_train:
+        if is_train and self.pareto_front_scope != "intra_group":
             self.pareto_cache.update(score_tensor.tolist())
 
         # ------------------------------------------------------------------

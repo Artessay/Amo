@@ -175,3 +175,80 @@ def test_front_update_then_contribution_is_zero_for_cached_point():
     repeat = torch.tensor([[3.0, 1.0]])
     r = HybridRewardModel.compute_group_hybrid_rewards(repeat, front, ref)
     assert r[0].item() <= 1e-6
+
+
+# ----------------------------------------------------------------------
+# [P0] Reward-collapse control: an inflated background front kills the
+# per-group signal, while the intra-group form (empty front) keeps it.
+# This mirrors the moo_suite collapse experiment at the reward-signal level
+# and guards against regressing to the pre-P0 behaviour.
+# See docs/hvpo_collapse_diagnosis.md.
+# ----------------------------------------------------------------------
+def _group_hv_rewards(front: torch.Tensor) -> torch.Tensor:
+    """Per-member exclusive-HV rewards for a fixed, diverse group."""
+    ref = torch.tensor([0.0, 0.0])
+    # A diverse group with a real trade-off (one helpful-leaning, one
+    # harmless-leaning, one balanced, one dominated).
+    group = torch.tensor([[0.9, 0.4], [0.4, 0.9], [0.6, 0.6], [0.2, 0.2]])
+    return HybridRewardModel.compute_group_hybrid_rewards(group, front, ref)
+
+
+def test_p0_intra_group_signal_is_discriminative():
+    """With an empty background front (intra_group scope) the non-dominated
+    members receive positive, clearly different HV contributions -- a usable
+    training signal."""
+    r = _group_hv_rewards(torch.zeros((0, 2)))
+    n_positive = int((r > 1e-6).sum())
+    assert n_positive >= 2, f"intra-group signal too flat: only {n_positive} positive"
+    assert float(r.std()) > 0.1
+
+
+def test_p0_inflated_front_collapses_signal():
+    """A background front that dominates the whole group (mimicking the inflated
+    persistent cache) drives every exclusive-HV contribution to ~0, so the
+    only remaining signal is the distance penalty on the dominated member.
+    This is the failure mode P0 removes by defaulting to the intra_group scope."""
+    # A dense non-dominated surface that dominates every group member.
+    t = torch.linspace(0.0, 1.0, 300)
+    inflated = torch.stack([0.3 + 1.0 * t, 1.3 - 1.0 * t], dim=1).clamp(0.0, 1.2)
+
+    r_inflated = _group_hv_rewards(inflated)
+    r_intra = _group_hv_rewards(torch.zeros((0, 2)))
+
+    n_pos_inflated = int((r_inflated > 1e-6).sum())
+    n_pos_intra = int((r_intra > 1e-6).sum())
+    # The inflated front must wipe out the positive HV contributions that the
+    # intra-group form produces.
+    assert n_pos_inflated == 0, f"expected full collapse, got {n_pos_inflated} positive"
+    assert n_pos_intra >= 2, f"intra-group control failed: {n_pos_intra} positive"
+
+
+def test_p0_manager_defaults_to_intra_group_and_normalizes():
+    """The shipped reward manager must default to the collapse-free config:
+    intra_group scope + objective normalization."""
+    from verl.workers.reward_manager.amo_hvpo import AmoHvpoRewardManager
+
+    # Two dummy objective fns so len(compute_score) == 2 (config validation).
+    compute_score = {"obj_a": lambda **kw: 0.0, "obj_b": lambda **kw: 0.0}
+    mgr = AmoHvpoRewardManager(
+        tokenizer=None, num_examine=0, compute_score=compute_score, hv_config={}
+    )
+    assert mgr.pareto_front_scope == "intra_group"
+    assert mgr.normalize_objectives is True
+
+
+def test_p0_normalization_maps_to_unit_range():
+    """Running min/max normalization maps raw reward-model scores into [0, 1]."""
+    from verl.workers.reward_manager.amo_hvpo import AmoHvpoRewardManager
+
+    compute_score = {"obj_a": lambda **kw: 0.0, "obj_b": lambda **kw: 0.0}
+    mgr = AmoHvpoRewardManager(
+        tokenizer=None, num_examine=0, compute_score=compute_score, hv_config={}
+    )
+    raw = torch.tensor([[-2.0, 1.0], [6.0, 7.0], [2.0, 4.0]])
+    mgr._update_objective_stats(raw)
+    normed = mgr._normalize_scores(raw)
+    assert normed.min().item() >= -1e-6 and normed.max().item() <= 1.0 + 1e-6
+    # The observed min maps to 0 and the observed max maps to 1 per column.
+    assert torch.allclose(normed.min(dim=0).values, torch.zeros(2), atol=1e-6)
+    assert torch.allclose(normed.max(dim=0).values, torch.ones(2), atol=1e-6)
