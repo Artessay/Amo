@@ -30,15 +30,15 @@ def enable_full_determinism(seed: int):
     torch.backends.cudnn.enabled = False
 
 
-def load_model_and_tokenizer(model_path: str):
+def load_model_and_tokenizer(model_path: str, gpu_mem_util: float = 0.9):
     # Get the number of available GPUs
     num_gpus = torch.cuda.device_count()
     print(f"Number of available GPUs: {num_gpus}")
 
     # initialize the model
     tokenizer = AutoTokenizer.from_pretrained(model_path, fix_mistral_regex=True)
-    llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=0.9)
-    
+    llm = LLM(model=model_path, tensor_parallel_size=num_gpus, gpu_memory_utilization=gpu_mem_util)
+
     return llm, tokenizer
 
 def inference(llm: LLM, prompts: list, sampling_params: SamplingParams):
@@ -62,7 +62,7 @@ def generate(args):
 
     enable_full_determinism(seed)
 
-    llm, tokenizer = load_model_and_tokenizer(model_path)
+    llm, tokenizer = load_model_and_tokenizer(model_path, gpu_mem_util=args.gpu_mem_util)
     print(f"Start inference on {data_path} with {model_path}")
 
     # read dataset.
@@ -104,6 +104,9 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--max_tokens', type=int, default=2048, help='max tokens')
 
     parser.add_argument('-s', '--seed', type=int, default=42, help='random seed')
+
+    parser.add_argument('-g', '--gpu_mem_util', type=float, default=0.9,
+                        help='vLLM gpu_memory_utilization (lower it to coexist with other GPU processes, e.g. reward servers)')
 
     args = parser.parse_args()
     print(args)

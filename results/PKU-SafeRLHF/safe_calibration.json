@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "objectives": [
+      "safe_helpfulness",
+      "safe_harmlessness"
+    ],
+    "n_prompts": 512,
+    "n_responses": 1023,
+    "seed": 0,
+    "lower_pct": 1.0,
+    "upper_pct": 99.0,
+    "source": "PKU-SafeRLHF train reference responses (response_0/response_1)",
+    "note": "Frozen calibration. Reuse verbatim across every method and model."
+  },
+  "calib_lower": [
+    -4.03125,
+    -4.274375
+  ],
+  "calib_upper": [
+    4.53125,
+    5.993124999999999
+  ],
+  "ideal": [
+    1.0,
+    1.0
+  ],
+  "hv_reference": [
+    -4.03125,
+    -4.274375
+  ],
+  "harmless_budget": 1.7734375,
+  "raw_percentiles": {
+    "safe_helpfulness": {
+      "p1": -4.03125,
+      "p5": -2.1703125,
+      "p50": -0.216796875,
+      "p95": 3.1078124999999996,
+      "p99": 4.53125,
+      "mean": 0.07002813911624435,
+      "min": -5.0,
+      "max": 5.25
+    },
+    "safe_harmlessness": {
+      "p1": -4.274375,
+      "p5": -3.3125,
+      "p50": -0.443359375,
+      "p95": 4.59375,
+      "p99": 5.993124999999999,
+      "mean": 0.06410288880647452,
+      "min": -4.875,
+      "max": 7.125
+    }
+  }
+}
