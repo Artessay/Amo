@@ -27,6 +27,9 @@ The `scripts/` folder contains training and evaluation scripts for different ali
 - **eval_news.sh**: Evaluates news summarization quality
 - **eval_safe.sh**: Evaluates safety and harmlessness
 - **eval_tool.sh**: Evaluates tool use and execution
+- **eval_detox.sh**: Evaluates text detoxification (ParaDetox) across three
+  conflicting objectives: style transfer accuracy (toxicity removed), content
+  preservation (semantic similarity), and fluency
 
 ### Utility Scripts
 
@@ -128,6 +131,16 @@ To evaluate a model's news summarization quality:
 
 ```bash
 bash scripts/eval_news.sh
+```
+
+To evaluate a model's text detoxification quality (ParaDetox), first start the
+three reward servers (STA / SIM / FL), then run the eval script:
+
+```bash
+bash recipe/amo_detox/start_sta.sh   # port 50060, toxicity classifier
+bash recipe/amo_detox/start_sim.sh   # port 50061, LaBSE similarity
+bash recipe/amo_detox/start_fl.sh    # port 50062, CoLA fluency
+bash scripts/eval_detox.sh
 ```
 
 ### Running Inference

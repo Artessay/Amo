@@ -1,0 +1,18 @@
+syntax = "proto3";
+package recipe.amo_detox;
+
+service RewardService {
+  rpc ComputeScore (ScoreRequest) returns (ScoreResponse) {}
+}
+
+message ScoreRequest {
+  // For STA / FL: `prompt` is unused, `response` holds the model output.
+  // For SIM: `prompt` holds the original toxic source sentence and `response`
+  //          holds the model output; the server returns their cosine similarity.
+  string prompt = 1;
+  string response = 2;
+}
+
+message ScoreResponse {
+  double reward_score = 1;
+}

@@ -110,6 +110,9 @@ ENV/
 # trae
 .trae
 
+# claude
+.claude
+
 # Mac
 .DS_Store
 
