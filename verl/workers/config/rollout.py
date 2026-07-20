@@ -119,6 +119,8 @@ class RolloutConfig(BaseConfig):
 
     name: Optional[str] = MISSING
     mode: str = "async"
+    # Random seed forwarded to the inference engine (vLLM/SGLang).
+    seed: int = 0
     skip_tokenizer_init: bool = True
 
     temperature: float = 1.0
