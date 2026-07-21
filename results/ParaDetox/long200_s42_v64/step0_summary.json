@@ -1,0 +1,127 @@
+{
+  "grpo": {
+    "step": 0,
+    "num_prompts": 64,
+    "num_responses": 256,
+    "num_objective_values_clipped_for_hv": 0,
+    "mean_sta": 0.8830798400053936,
+    "mean_sim": 0.7071380123088602,
+    "mean_fluency": 0.8651227064256091,
+    "mean_linear_reward": 0.8184468529132876,
+    "mean_joint_product": 0.5293656303367764,
+    "mean_response_set_hv": 0.708247085112193,
+    "mean_nondominated_per_prompt": 3.34375,
+    "multi_point_front_rate": 0.984375,
+    "mean_incomparable_pair_rate": 0.8932291666666667,
+    "mean_duplicate_objective_point_rate": 0.05859375,
+    "mean_duplicate_output_rate": 0.05859375,
+    "sta_sim_pearson": -0.18641612622970116,
+    "within_prompt_sta_sim_pearson": -0.3658010280269893,
+    "mean_output_words": 11.2890625
+  },
+  "hvpo": {
+    "step": 0,
+    "num_prompts": 64,
+    "num_responses": 256,
+    "num_objective_values_clipped_for_hv": 0,
+    "mean_sta": 0.8830798400053936,
+    "mean_sim": 0.7071380123088602,
+    "mean_fluency": 0.8651227064256091,
+    "mean_linear_reward": 0.8184468529132876,
+    "mean_joint_product": 0.5293656303367764,
+    "mean_response_set_hv": 0.708247085112193,
+    "mean_nondominated_per_prompt": 3.34375,
+    "multi_point_front_rate": 0.984375,
+    "mean_incomparable_pair_rate": 0.8932291666666667,
+    "mean_duplicate_objective_point_rate": 0.05859375,
+    "mean_duplicate_output_rate": 0.05859375,
+    "sta_sim_pearson": -0.18641612622970116,
+    "within_prompt_sta_sim_pearson": -0.3658010280269893,
+    "mean_output_words": 11.2890625
+  },
+  "paired_comparison": {
+    "num_paired_prompts": 64,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 42,
+    "metrics": {
+      "mean_response_set_hv": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      },
+      "mean_joint_product": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      },
+      "mean_linear_reward": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      },
+      "mean_sta": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      },
+      "mean_sim": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      },
+      "mean_fluency": {
+        "hvpo_minus_grpo": 0.0,
+        "paired_bootstrap_95_ci": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_fraction_gt_zero": 0.0,
+        "positive_tied_negative_prompt_deltas": [
+          0,
+          64,
+          0
+        ]
+      }
+    }
+  }
+}

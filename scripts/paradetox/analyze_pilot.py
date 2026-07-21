@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from itertools import combinations
 import json
 from pathlib import Path
 
@@ -69,6 +70,43 @@ def _front_mask(points: np.ndarray) -> np.ndarray:
     return keep
 
 
+def _pearson_or_none(first: np.ndarray, second: np.ndarray) -> float | None:
+    """Return Pearson correlation, or ``None`` when it is undefined."""
+    first = np.asarray(first, dtype=float)
+    second = np.asarray(second, dtype=float)
+    if first.size < 2 or second.size != first.size:
+        return None
+    if not np.all(np.isfinite(first)) or not np.all(np.isfinite(second)):
+        return None
+    if first.std() == 0.0 or second.std() == 0.0:
+        return None
+    correlation = float(np.corrcoef(first, second)[0, 1])
+    return correlation if np.isfinite(correlation) else None
+
+
+def _expected_subset_hypervolumes(points: np.ndarray) -> np.ndarray:
+    """Return exact expected HV for uniform subsets of every size 1..n.
+
+    Rows are treated as distinct sampled responses, including when two rows have
+    identical objective values. Consequently, the expectation is over all
+    ``n choose k`` index subsets, which is the response-budget quantity HV@k.
+    Callers are responsible for applying the same clipping used by the regular
+    response-set HV metric.
+    """
+    if points.ndim != 2 or len(points) < 1:
+        raise ValueError("points must be a non-empty 2D array")
+
+    expected = np.empty(len(points), dtype=float)
+    ref_point = [0.0] * points.shape[1]
+    for subset_size in range(1, len(points) + 1):
+        subset_hvs = [
+            compute_hypervolume(points[list(indices)], ref_point=ref_point)
+            for indices in combinations(range(len(points)), subset_size)
+        ]
+        expected[subset_size - 1] = float(np.mean(subset_hvs))
+    return expected
+
+
 def _group_rows(rows: list[dict], responses_per_prompt: int | None) -> list[list[dict]]:
     if responses_per_prompt is not None:
         if responses_per_prompt < 1:
@@ -111,6 +149,9 @@ def _analyze_rows(
 
     all_points = np.asarray([[float(row[key]) for key in OBJECTIVES] for row in rows], dtype=float)
     clipped = np.clip(all_points, 0.0, 1.0)
+    group_sizes = [len(group) for group in groups]
+    common_subset_size = min(group_sizes)
+    prompt_hv_by_k = {subset_size: [] for subset_size in range(1, common_subset_size + 1)}
     prompt_hv = []
     prompt_joint = []
     prompt_linear = []
@@ -126,7 +167,10 @@ def _analyze_rows(
             [[float(row[key]) for key in OBJECTIVES] for row in prompt_rows], dtype=float
         )
         points = np.clip(raw_points, 0.0, 1.0)
-        prompt_hv.append(compute_hypervolume(points, ref_point=[0.0, 0.0, 0.0]))
+        expected_subset_hv = _expected_subset_hypervolumes(points)
+        prompt_hv.append(float(expected_subset_hv[-1]))
+        for subset_size in prompt_hv_by_k:
+            prompt_hv_by_k[subset_size].append(float(expected_subset_hv[subset_size - 1]))
         prompt_joint.append(float(np.prod(points, axis=1).mean()))
         prompt_linear.append(float(raw_points.mean(axis=1).mean()))
         prompt_objectives.append(raw_points.mean(axis=0))
@@ -147,10 +191,23 @@ def _analyze_rows(
             1.0 - len({str(row.get("output", "")) for row in prompt_rows}) / len(prompt_rows)
         )
 
-    corr = float(np.corrcoef(all_points[:, 0], all_points[:, 1])[0, 1]) if len(rows) > 1 else float("nan")
-    within_prompt_corr = (
-        float(np.corrcoef(centered_sta, centered_sim)[0, 1]) if len(rows) > 1 else float("nan")
+    hv_at_k = {
+        f"mean_response_set_hv_at_{subset_size}": np.asarray(values, dtype=float)
+        for subset_size, values in prompt_hv_by_k.items()
+    }
+    prompt_hv_array = np.asarray(prompt_hv, dtype=float)
+    full_hv_key = None
+    if len(set(group_sizes)) == 1:
+        full_hv_key = f"mean_response_set_hv_at_{group_sizes[0]}"
+        # Use the same array for the backward-compatible alias so HV@n is exact.
+        prompt_hv_array = hv_at_k[full_hv_key]
+    mean_hv_at_k = {key: float(values.mean()) for key, values in hv_at_k.items()}
+    mean_response_set_hv = (
+        mean_hv_at_k[full_hv_key] if full_hv_key is not None else float(prompt_hv_array.mean())
     )
+
+    corr = _pearson_or_none(all_points[:, 0], all_points[:, 1])
+    within_prompt_corr = _pearson_or_none(centered_sta, centered_sim)
     metrics = {
         "num_prompts": len(groups),
         "num_responses": len(rows),
@@ -160,7 +217,8 @@ def _analyze_rows(
         "mean_fluency": float(all_points[:, 2].mean()),
         "mean_linear_reward": float(all_points.mean(axis=1).mean()),
         "mean_joint_product": float(np.prod(clipped, axis=1).mean()),
-        "mean_response_set_hv": float(np.mean(prompt_hv)),
+        "mean_response_set_hv": mean_response_set_hv,
+        **mean_hv_at_k,
         "mean_nondominated_per_prompt": float(np.mean(front_sizes)),
         "multi_point_front_rate": float(np.mean(np.asarray(front_sizes) >= 2)),
         "mean_incomparable_pair_rate": float(np.mean(conflict_rates)),
@@ -172,7 +230,8 @@ def _analyze_rows(
     }
     objective_means = np.asarray(prompt_objectives)
     per_prompt = {
-        "mean_response_set_hv": np.asarray(prompt_hv, dtype=float),
+        "mean_response_set_hv": prompt_hv_array,
+        **hv_at_k,
         "mean_joint_product": np.asarray(prompt_joint, dtype=float),
         "mean_linear_reward": np.asarray(prompt_linear, dtype=float),
         "mean_sta": objective_means[:, 0],
@@ -233,6 +292,85 @@ def _paired_comparison(
         "bootstrap_samples": bootstrap_samples,
         "bootstrap_seed": bootstrap_seed,
         "metrics": metrics,
+    }
+
+
+def _analyze_step_pair(
+    grpo_dir: Path,
+    hvpo_dir: Path,
+    step: int,
+    responses_per_prompt: int | None,
+    bootstrap_samples: int,
+    bootstrap_seed: int,
+) -> tuple[dict, dict[str, tuple[dict[str, np.ndarray], list[tuple[str, str]]]]]:
+    """Analyze one validation checkpoint and retain arrays needed by paired tests."""
+    analyses = {}
+    result = {}
+    for method, directory in (("grpo", grpo_dir), ("hvpo", hvpo_dir)):
+        rows = _load_step(directory, step)
+        metrics, per_prompt, prompt_keys = _analyze_rows(rows, responses_per_prompt)
+        analyses[method] = (per_prompt, prompt_keys)
+        result[method] = {"step": step, **metrics}
+
+    _validate_pairing(analyses["grpo"][1], analyses["hvpo"][1])
+    result["paired_comparison"] = _paired_comparison(
+        analyses["grpo"][0],
+        analyses["hvpo"][0],
+        bootstrap_samples=bootstrap_samples,
+        bootstrap_seed=bootstrap_seed,
+    )
+    return result, analyses
+
+
+def _analyze_validation_trajectory(
+    grpo_dir: Path,
+    hvpo_dir: Path,
+    through_step: int,
+    responses_per_prompt: int | None,
+    bootstrap_samples: int,
+    bootstrap_seed: int,
+) -> dict:
+    """Analyze every validation step present for both methods through ``through_step``."""
+    grpo_steps = {step for step in _step_files(grpo_dir) if step <= through_step}
+    hvpo_steps = {step for step in _step_files(hvpo_dir) if step <= through_step}
+    common_steps = sorted(grpo_steps & hvpo_steps)
+    if not common_steps:
+        raise FileNotFoundError(
+            f"No common validation steps through {through_step}: "
+            f"GRPO={sorted(grpo_steps)}, HVPO={sorted(hvpo_steps)}"
+        )
+
+    per_step = {}
+    reference_keys: dict[str, list[tuple[str, str]]] = {}
+    for step in common_steps:
+        step_result, analyses = _analyze_step_pair(
+            grpo_dir,
+            hvpo_dir,
+            step,
+            responses_per_prompt,
+            bootstrap_samples,
+            bootstrap_seed,
+        )
+        for method in ("grpo", "hvpo"):
+            keys = analyses[method][1]
+            if method in reference_keys:
+                try:
+                    _validate_pairing(reference_keys[method], keys)
+                except ValueError as error:
+                    raise ValueError(
+                        f"{method.upper()} validation prompts changed between step "
+                        f"{common_steps[0]} and step {step}: {error}"
+                    ) from error
+            else:
+                reference_keys[method] = keys
+        per_step[str(step)] = step_result
+
+    return {
+        "through_step": through_step,
+        "common_steps": common_steps,
+        "grpo_only_steps": sorted(grpo_steps - hvpo_steps),
+        "hvpo_only_steps": sorted(hvpo_steps - grpo_steps),
+        "per_step": per_step,
     }
 
 
@@ -318,19 +456,100 @@ def _self_test() -> None:
                 **dict(zip(OBJECTIVES, point.tolist())),
             }
         )
-    metrics = summarize(rows)
+    metrics, per_prompt, _ = _analyze_rows(rows, responses_per_prompt=None)
     assert metrics["num_prompts"] == 1
     assert metrics["mean_nondominated_per_prompt"] == 2.0
     assert metrics["mean_response_set_hv"] > 0
+    assert np.isclose(metrics["mean_response_set_hv_at_1"], metrics["mean_joint_product"])
+    assert metrics["mean_response_set_hv_at_3"] == metrics["mean_response_set_hv"]
+    assert per_prompt["mean_response_set_hv_at_3"] is per_prompt["mean_response_set_hv"]
+    assert np.allclose(per_prompt["mean_response_set_hv_at_1"], per_prompt["mean_joint_product"])
     duplicate_rows = rows + [dict(rows[0])]
     duplicate_metrics = summarize(duplicate_rows)
     assert duplicate_metrics["mean_nondominated_per_prompt"] == 2.0
     assert np.isclose(duplicate_metrics["mean_incomparable_pair_rate"], 1.0 / 3.0)
 
+    constant_rows = [
+        {
+            "input": "constant prompt",
+            "output": f"constant output {index}",
+            **dict(zip(OBJECTIVES, [0.5, 0.5, 0.5])),
+        }
+        for index in range(2)
+    ]
+    constant_metrics = summarize(constant_rows)
+    assert constant_metrics["sta_sim_pearson"] is None
+    assert constant_metrics["within_prompt_sta_sim_pearson"] is None
+    json.dumps(constant_metrics, allow_nan=False)
+
     grpo = {"metric": np.asarray([0.1, 0.2, 0.3])}
     hvpo = {"metric": np.asarray([0.2, 0.3, 0.4])}
     comparison = _paired_comparison(grpo, hvpo, bootstrap_samples=100, bootstrap_seed=0)
     assert np.isclose(comparison["metrics"]["metric"]["hvpo_minus_grpo"], 0.1)
+
+    from tempfile import TemporaryDirectory
+
+    synthetic_rows = [
+        ("prompt one", "answer a", [0.20, 0.40, 0.70]),
+        ("prompt one", "answer b", [0.40, 0.20, 0.70]),
+        ("prompt two", "answer c", [0.30, 0.50, 0.60]),
+        ("prompt two", "answer d", [0.50, 0.30, 0.60]),
+    ]
+    with TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        grpo_dir = root / "grpo"
+        hvpo_dir = root / "hvpo"
+        grpo_dir.mkdir()
+        hvpo_dir.mkdir()
+
+        def write_step(directory: Path, step: int, bonus: float) -> None:
+            rows = []
+            for prompt, output, objective_values in synthetic_rows:
+                rows.append(
+                    {
+                        "step": step,
+                        "input": prompt,
+                        "gts": "reference",
+                        "output": output,
+                        **{
+                            key: value + step / 1000.0 + bonus
+                            for key, value in zip(OBJECTIVES, objective_values)
+                        },
+                    }
+                )
+            (directory / f"{step}.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+            )
+
+        write_step(grpo_dir, 0, 0.0)
+        write_step(hvpo_dir, 0, 0.0)
+        write_step(grpo_dir, 20, 0.0)
+        write_step(hvpo_dir, 20, 0.1)
+        write_step(grpo_dir, 40, 0.0)
+        trajectory = _analyze_validation_trajectory(
+            grpo_dir,
+            hvpo_dir,
+            through_step=40,
+            responses_per_prompt=2,
+            bootstrap_samples=100,
+            bootstrap_seed=0,
+        )
+        assert trajectory["common_steps"] == [0, 20]
+        assert trajectory["grpo_only_steps"] == [40]
+        assert trajectory["hvpo_only_steps"] == []
+        assert trajectory["per_step"]["20"]["grpo"]["step"] == 20
+        linear_delta = trajectory["per_step"]["20"]["paired_comparison"]["metrics"][
+            "mean_linear_reward"
+        ]
+        assert np.isclose(linear_delta["hvpo_minus_grpo"], 0.1)
+        assert np.allclose(linear_delta["paired_bootstrap_95_ci"], [0.1, 0.1])
+        checkpoint = trajectory["per_step"]["20"]
+        hv_metrics = checkpoint["paired_comparison"]["metrics"]
+        assert {"mean_response_set_hv_at_1", "mean_response_set_hv_at_2"} <= hv_metrics.keys()
+        assert checkpoint["grpo"]["mean_response_set_hv"] == checkpoint["grpo"][
+            "mean_response_set_hv_at_2"
+        ]
+        assert hv_metrics["mean_response_set_hv"] == hv_metrics["mean_response_set_hv_at_2"]
     print("self-test passed")
 
 
@@ -355,22 +574,23 @@ def main() -> None:
         parser.error("--grpo-dir and --hvpo-dir are required unless --self-test is used")
 
     step = _resolve_step(args.grpo_dir, args.hvpo_dir, args.step)
-    analyses = {}
-    results = {}
-    for method, directory in (("grpo", args.grpo_dir), ("hvpo", args.hvpo_dir)):
-        rows = _load_step(directory, step)
-        metrics, per_prompt, prompt_keys = _analyze_rows(rows, args.responses_per_prompt)
-        analyses[method] = (per_prompt, prompt_keys)
-        results[method] = {"step": step, **metrics}
-
-    _validate_pairing(analyses["grpo"][1], analyses["hvpo"][1])
-    comparison = _paired_comparison(
-        analyses["grpo"][0],
-        analyses["hvpo"][0],
+    results, analyses = _analyze_step_pair(
+        args.grpo_dir,
+        args.hvpo_dir,
+        step,
+        args.responses_per_prompt,
+        args.bootstrap_samples,
+        args.bootstrap_seed,
+    )
+    comparison = results["paired_comparison"]
+    results["validation_trajectory"] = _analyze_validation_trajectory(
+        args.grpo_dir,
+        args.hvpo_dir,
+        through_step=step,
+        responses_per_prompt=args.responses_per_prompt,
         bootstrap_samples=args.bootstrap_samples,
         bootstrap_seed=args.bootstrap_seed,
     )
-    results["paired_comparison"] = comparison
 
     if args.baseline_step != step:
         baseline_analyses = {}
@@ -442,6 +662,26 @@ def main() -> None:
         low, high = stats["paired_bootstrap_95_ci"]
         print(f"  {key}: {stats['hvpo_minus_grpo']:+.6f} (paired 95% CI [{low:+.6f}, {high:+.6f}])")
 
+    trajectory = results["validation_trajectory"]
+    print(f"\nCOMMON VALIDATION TRAJECTORY (through step {trajectory['through_step']})")
+    for trajectory_step in trajectory["common_steps"]:
+        checkpoint = trajectory["per_step"][str(trajectory_step)]
+        grpo_hv = checkpoint["grpo"]["mean_response_set_hv"]
+        hvpo_hv = checkpoint["hvpo"]["mean_response_set_hv"]
+        hv_delta = checkpoint["paired_comparison"]["metrics"]["mean_response_set_hv"]
+        low, high = hv_delta["paired_bootstrap_95_ci"]
+        print(
+            f"  step {trajectory_step}: GRPO HV={grpo_hv:.6f}, HVPO HV={hvpo_hv:.6f}, "
+            f"delta={hv_delta['hvpo_minus_grpo']:+.6f} "
+            f"(paired 95% CI [{low:+.6f}, {high:+.6f}])"
+        )
+    if trajectory["grpo_only_steps"] or trajectory["hvpo_only_steps"]:
+        print(
+            "  unmatched validation steps: "
+            f"GRPO-only={trajectory['grpo_only_steps']}, "
+            f"HVPO-only={trajectory['hvpo_only_steps']}"
+        )
+
     if "change_from_baseline" in results:
         print(f"\nSTEP {step} - STEP {args.baseline_step}")
         delta_label = f"step_{step}_minus_step_{args.baseline_step}"
@@ -472,7 +712,7 @@ def main() -> None:
 
     output = args.output or args.grpo_dir.parent.parent / "summary.json"
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(results, indent=2, allow_nan=True) + "\n", encoding="utf-8")
+    output.write_text(json.dumps(results, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(f"\nSaved {output}")
 
 
