@@ -9,9 +9,9 @@ Per-objective test means and dominated hypervolume (HV, ref = origin) for each m
 
 | Method | Helpfulness | Harmlessness | Hypervolume | #prompts |
 |---|---|---|---|---|
-| GRPO (equal-weight) | - | - | - | - |
-| GDPO | - | - | - | - |
-| HVPO | - | - | - | - |
+| GRPO (equal-weight) | 5.755 | 6.995 | 43.1602 | 8211 |
+| GDPO | 5.686 | 6.960 | 43.1602 | 8211 |
+| HVPO | 5.500 | 6.848 | 43.1582 | 8211 |
 | LS / MORLHF | - | - | - | - |
 | Tchebycheff | - | - | - | - |
 | GDPO (weighted) | - | - | - | - |
@@ -29,9 +29,9 @@ Per-objective test means and dominated hypervolume (HV, ref = origin) for each m
 
 | Method | Helpfulness | Harmlessness | Hypervolume | #prompts |
 |---|---|---|---|---|
-| GRPO (equal-weight) | 5.743 | 6.992 | 43.1396 | 8211 |
-| GDPO | - | - | - | - |
-| HVPO | 5.698 | 6.966 | 43.3818 | 8211 |
+| GRPO (equal-weight) | 5.440 | 6.794 | 43.3740 | 8211 |
+| GDPO | 5.191 | 6.683 | 43.1582 | 8211 |
+| HVPO | 5.503 | 6.828 | 43.3799 | 8211 |
 | LS / MORLHF | - | - | - | - |
 | Tchebycheff | - | - | - | - |
 | GDPO (weighted) | - | - | - | - |

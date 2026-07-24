@@ -8,13 +8,8 @@ PY=/home/rihongqiu/data/miniconda3/envs/amo/bin/python
 LOGDIR=/tmp/amo_reward_logs
 mkdir -p $LOGDIR
 
-<<<<<<< HEAD
-# align_anything 通过 diffusers 触发 xformers 的 flash-attn 版本检查; flash-attn 2.8.3
-# 超出 xformers 允许范围. 这是 xformers 官方提供的跳过开关 (见 fmha/flash.py).
-=======
 # align_anything was written for transformers<5; flash-attn 2.8.3 also trips xformers'
 # version guard. This env var is the official xformers escape hatch (see fmha/flash.py).
->>>>>>> a21f29e (fix env)
 export XFORMERS_IGNORE_FLASH_VERSION_CHECK=1
 
 MODE=${1:?need safe|news|stop}

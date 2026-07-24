@@ -7,7 +7,7 @@ PROJECT_PREFIX="amo"
 
 DATASETS=(
     # "MATH-500"
-    "MATH-lighteval"
+    "MATH-LightEval"
     # "PKU-SafeRLHF"
     # "RLLA"
     # "CNN_DailyMail"
@@ -80,6 +80,7 @@ for DATASET in "${DATASETS[@]}"; do
             fi
         fi
 
+        mkdir -p "$WORKSPACE/results/$DATASET"
         OUTPUT_PATH="$WORKSPACE/results/$DATASET/$EXPERIMENT_NAME.parquet"
         # if [ -f "$OUTPUT_PATH" ]; then
         #     echo "Output file already exists: $OUTPUT_PATH"

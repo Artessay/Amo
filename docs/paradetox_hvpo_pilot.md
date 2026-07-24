@@ -1,5 +1,27 @@
 # HVPO vs GRPO: ParaDetox pilot
 
+> **Legacy reproduction only.** This pilot predates the repository-wide
+> experiment contract. Its launcher writes
+> `results/ParaDetox/<RUN_TAG>/<experiment>/{checkpoints,rollouts,validation}`;
+> in particular, it incorrectly places checkpoints below `results/`. The layout
+> is retained only so the historical numbers below remain reproducible. Do not
+> copy it for a new ParaDetox run, and do not treat a pilot directory as a
+> standard completed result.
+
+New ParaDetox experiments MUST use the canonical layout from the root README:
+
+```text
+checkpoints/amo_paradetox/<experiment>/...
+results/ParaDetox/<experiment>.parquet
+results/ParaDetox/<experiment>.json
+```
+
+They must also provide/use a method-specific launcher such as
+`scripts/trainers/<method>/run_paradetox.sh [MODEL] [EPOCH]`, then run merge,
+inference, and `scripts/eval_detox.sh`. The legacy rollout/validation JSONL
+files and pilot summaries are optional diagnostics, not substitutes for the
+required generated-response Parquet and metric JSON.
+
 ## Choice
 
 - Benchmark: ParaDetox English text detoxification.

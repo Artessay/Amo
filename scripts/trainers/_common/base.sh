@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# Shared optimization/runtime defaults. Dataset, model, and method profiles may
+# override these values before launch.sh resolves environment overrides.
+configure_base() {
+    PROFILE_EPOCHS=1
+    PROFILE_TRAIN_BATCH_SIZE=512
+    PROFILE_MAX_PROMPT_LENGTH=2048
+    PROFILE_MAX_RESPONSE_LENGTH=1024
+    PROFILE_PPO_MINI_BATCH_SIZE=128
+    PROFILE_MICRO_BATCH_SIZE_PER_GPU=32
+    PROFILE_NUM_NODES=1
+    PROFILE_NUM_GPUS_PER_NODE=2
+    PROFILE_TENSOR_MODEL_PARALLEL_SIZE=1
+    PROFILE_GPU_MEMORY_UTILIZATION=0.6
+    PROFILE_ROLLOUT_N=4
+    PROFILE_SAVE_FREQ=10
+    PROFILE_TEST_FREQ=10
+    PROFILE_RESUME_MODE=auto
+    PROFILE_VAL_BEFORE_TRAIN=True
+    PROFILE_TRAIN_GPUS=""
+    PROFILE_LOGGER='["console", "swanlab"]'
+
+    MODEL_OVERRIDES=()
+    DATASET_OVERRIDES=()
+    METHOD_OVERRIDES=()
+    VARIANT_OVERRIDES=()
+}

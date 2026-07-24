@@ -9,7 +9,86 @@ The Amo project is organized into the following main folders:
 - **data/**: Datasets used for training and evaluation
 - **recipe/**: Evaluation metrics and scoring recipes for different tasks
 - **scripts/**: Training and evaluation scripts
+- **checkpoints/**: Resumable trainer state and merged model weights
+- **results/**: Generated test-set responses and machine-readable evaluation results
 - **verl/**: Reinforcement learning framework and utilities
+
+## Required Experiment Contract
+
+The following rules are **mandatory for every new method, task, and experiment**.
+An experiment is not complete when training stops or a checkpoint exists. It is
+complete only after the selected checkpoint has been merged, used for test-set
+inference, evaluated, and its standard result files have been written under
+`results/`.
+
+### Scripts
+
+- Every method MUST have its own `scripts/trainers/<method>/` directory with a
+  separately runnable, executable `run_<dataset>.sh` for each supported
+  dataset. The public launcher contract is
+  `scripts/trainers/<method>/run_<dataset>.sh [MODEL] [EPOCH]`; for example,
+  `bash scripts/trainers/hvpo/run_pku-saferlhf.sh 3b 1`. Shared implementation
+  belongs under `scripts/trainers/_common/`, but a generic dispatcher alone is
+  not a compliant per-method launcher.
+- Every task MUST have `scripts/eval_<task>.sh`; for example,
+  `scripts/eval_safe.sh` and `scripts/eval_detox.sh`. A new task must also be
+  supported by `scripts/merge_model.sh` and `scripts/inference.sh`, or provide
+  thin wrappers with the same inputs and output layout.
+- Launchers MUST work from the repository root, derive the workspace from their
+  own location, use repository-relative data/output paths, and keep one
+  experiment name unchanged across training, merge, inference, and evaluation.
+  Machine-specific model paths and GPU selection may be configurable, but must
+  not change the artifact names.
+
+### Names and artifact layout
+
+Use a stable experiment name such as `<model-tag>_<method>`; append an explicit
+suffix for a real experimental dimension such as `_seed42` or a named ablation.
+Do not encode a temporary machine, GPU, or rerun name in it.
+
+Given dataset directory name `<Dataset>`, lower-case task slug `<task-slug>`,
+and experiment name `<experiment>`, the canonical layout is:
+
+```text
+checkpoints/amo_<task-slug>/<experiment>/
+  latest_checkpointed_iteration.txt
+  global_step_<N>/
+    actor/
+      merge/                         # merged model, when required
+
+results/<Dataset>/
+  <experiment>.parquet              # test prompts and generated responses
+  <experiment>.json                 # aggregate evaluation metrics
+```
+
+For example, PKU-SafeRLHF uses project `amo_pku-saferlhf` and produces
+`results/PKU-SafeRLHF/qwen2.5-1.5b_grpo.{parquet,json}`. The Parquet and JSON
+files MUST have the same experiment stem as the checkpoint directory.
+
+`checkpoints/` is only for model/trainer state, including LoRA/FSDP shards,
+optimizer state, and merged weights. `results/` is only for auditable generated
+responses, metrics, tables, plots, and small diagnostics. **Never place a
+checkpoint or merged model below `results/`.** Optional diagnostics may be
+stored below `results/<Dataset>/diagnostics/`, but they do not replace the
+required top-level `<experiment>.parquet` and `<experiment>.json` pair.
+
+### Required completion sequence
+
+For every trained experiment, all four stages MUST succeed:
+
+1. Train and save a resumable checkpoint under `checkpoints/amo_<task-slug>/`.
+2. Merge the selected/latest actor checkpoint with `scripts/merge_model.sh` (or
+   an equivalent task wrapper).
+3. Run test-set generation with `scripts/inference.sh`, producing
+   `results/<Dataset>/<experiment>.parquet`.
+4. Run `scripts/eval_<task>.sh`, producing the sibling
+   `results/<Dataset>/<experiment>.json`.
+
+Before reporting a run as done, verify that both result files exist, are
+non-empty, and correspond to the intended checkpoint. A checkpoint-only run is
+unfinished and must not be included as a completed comparison. Method/task
+changes should update their trainer launcher, merge/inference selection, and
+evaluation script in the same change.
 
 ## 📋 Scripts Folder
 
@@ -17,9 +96,22 @@ The `scripts/` folder contains training and evaluation scripts for different ali
 
 ### Trainer Scripts
 
-- **gdpo_trainer/**: Scripts for Generative Direct Preference Optimization
-- **grpo_trainer/**: Scripts for Group Relative Policy Optimization
-- **hvpo_trainer/**: Scripts for Hypervolume-Guided Policy Optimization
+- **trainers/**: Unified, method-oriented training launchers
+  - **_common/**: Shared launch logic plus dataset and model profiles
+  - **&lt;method&gt;/**: One `method.sh` and one independently runnable
+    `run_<dataset>.sh` per supported dataset (including `grpo/`, `gdpo/`,
+    `hvpo/`, and baseline methods)
+  - **orchestration/**: Sequential and matrix experiment runners
+  - **tools/**: Trainer-specific calibration, evaluation, and aggregation tools
+
+All public method launchers use the same interface:
+
+```bash
+bash scripts/trainers/<method>/run_<dataset>.sh [MODEL] [EPOCH]
+```
+
+When omitted, `MODEL` and `EPOCH` come from the shared model and dataset
+profiles, respectively.
 
 ### Evaluation Scripts
 
@@ -110,13 +202,13 @@ modelscope download --model LLM-Research/Llama-3.2-3B-Instruct  --local_dir /dat
 To train a model using GRPO on the math dataset:
 
 ```bash
-bash scripts/grpo_trainer/run_qwen2.5-3b_math-lighteval.sh
+bash scripts/trainers/grpo/run_math-lighteval.sh 3b 50
 ```
 
 To train a model using HVPO on the news dataset:
 
 ```bash
-bash scripts/hvpo_trainer/run_qwen2.5-3b_news.sh
+bash scripts/trainers/hvpo/run_news.sh 3b 15
 ```
 
 ### Evaluating Models
