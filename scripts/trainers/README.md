@@ -93,7 +93,7 @@ nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
 ```
 
 默认 baseline 顺序为
-每个方法默认依次跑 `math-lighteval -> pku-saferlhf -> rlla`，一个数据集的全部 variant
+每个方法默认依次跑 `math-lighteval -> pku-saferlhf -> rlla -> news`，一个数据集的全部 variant
 完成后再进入下一个数据集，全部数据集成功后才进入下一方法。
 
 四类任务在矩阵中的定位不同：
