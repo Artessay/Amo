@@ -89,7 +89,7 @@ scripts/trainers/
 
 ## Baseline 优先队列
 
-Qwen2.5-1.5B 的强 trade-off 队列使用 method-outer、dataset-inner 顺序：
+Qwen2.5-1.5B 的优先队列使用 method-outer、dataset-inner 顺序：
 
 ```bash
 mkdir -p train_logs/priority_baselines
@@ -99,28 +99,61 @@ nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
 
 默认 baseline 顺序为
 `ls -> tchebycheff -> gdpo_weighted -> rvpo -> ctwa -> lagrangian -> fair_stable -> mgda -> gapo -> dynamic_hv -> nsga2 -> smsemoa`；
-每个方法依次跑 `math-lighteval -> news -> rlla`，一个数据集的全部 variant
+每个方法默认依次跑 `math-lighteval -> pku-saferlhf -> rlla`，一个数据集的全部 variant
 完成后再进入下一个数据集，全部数据集成功后才进入下一方法。
 
+四类任务在矩阵中的定位不同：
+
+- MATH-LightEval 用 accuracy、conciseness、format 检验结果质量、推理效率与格式之间的
+  构造型 trade-off，默认约有 700 个 batch-iterations/variant。
+- PKU-SafeRLHF 的 helpfulness/harmlessness 是核心的内生冲突，默认约 144 个
+  batch-iterations/variant，必须进入默认矩阵。
+- RLLA 用 tool correctness/tool format 检验工具调用质量与结构约束，默认约 115 个
+  batch-iterations/variant。
+- NEWS 的四个质量目标大体同向，主要作为 aligned-objective control；其默认成本为
+  `287113 * 15 / 512 ~= 8411` batch-iterations/variant，因此不进入默认集合。
+  需要该 control 时显式设置
+  `BASELINE_DATASETS="math-lighteval pku-saferlhf rlla news"`，其 mapping、权重网格和
+  reward server 仍完整保留。
+
+HelpSteer2 尚未进入统一 baseline/评测矩阵，ParaDetox 目前也只覆盖 GRPO、GDPO、HVPO；
+两者暂缓，先完成上述默认矩阵。
+
 这是一个 H=2 + centroid 的 sparse pilot：`ls` 和 `gdpo_weighted` 在每个数据集
-先跑无 suffix 的 uniform centroid（保留历史 identity），其权重在 MATH-LightEval、
-NEWS、RLLA 上分别为 `[1/3,1/3,1/3]`、`[0.25,0.25,0.25,0.25]`、
-`[0.5,0.5]`。随后共用 H=2 非均匀权重网格，三个数据集分别有 6、10、2 个点：
-MATH-LightEval 为
-`h2w200 h2w020 h2w002 h2w110 h2w101 h2w011`，NEWS 为
-`h2w2000 h2w0200 h2w0020 h2w0002 h2w1100 h2w1010 h2w1001 h2w0110 h2w0101 h2w0011`，
-RLLA 为 `h2w20 h2w02`。`h2w` 后每位数字只能是 0、1、2，数字和必须为 2；
-实际权重为各位数字除以 2。digit 顺序分别为 MATH-LightEval 的
-`accuracy/conciseness/format`、NEWS 的 `coherence/fluency/relevance/consistency`、
-RLLA 的 `tool_correctness/tool_format`。
+先跑无 suffix 的 uniform centroid（保留历史 identity）。MATH-LightEval、PKU-SafeRLHF、
+RLLA、NEWS 的 centroid 依次为 `[1/3,1/3,1/3]`、`[0.5,0.5]`、`[0.5,0.5]`、
+`[0.25,0.25,0.25,0.25]`。随后共用 H=2 非均匀权重网格：
+
+- MATH-LightEval：`h2w200 h2w020 h2w002 h2w110 h2w101 h2w011`
+- PKU-SafeRLHF：`h2w20 h2w02`
+- RLLA：`h2w20 h2w02`
+- NEWS：`h2w2000 h2w0200 h2w0020 h2w0002 h2w1100 h2w1010 h2w1001 h2w0110 h2w0101 h2w0011`
+
+`h2w` 后每位数字只能是 0、1、2，数字和必须为 2，实际权重为各位数字除以 2。
+digit 顺序分别为 MATH-LightEval 的 `accuracy/conciseness/format`、PKU-SafeRLHF 的
+`safe_helpfulness/safe_harmlessness`、RLLA 的 `tool_correctness/tool_format`、
+NEWS 的 `coherence/fluency/relevance/consistency`。
 例如 `h2w101` 生成 `[0.5,0.0,0.5]`。uniform 实验继续使用
 `qwen2.5-1.5b_ls` / `qwen2.5-1.5b_gdpo_weighted`，非均匀实验则追加
 variant suffix。checkpoint、result、完成 marker 和训练日志均使用该唯一 suffix；
 base 日志仍为 `<method>.<dataset>.train.log`，sweep 日志为
 `<method>.<dataset>.<variant>.train.log`。
 
-任一 cell 失败时队列立即停止。News reward server 使用 GPU 0、1，训练使用
-GPU 2、3；每个实验默认保留最新 3 个 actor checkpoint，以兼顾故障回退与磁盘占用。
+PKU-SafeRLHF 的 scale-sensitive 方法必须复用
+`results/PKU-SafeRLHF/safe_calibration.json`，同一矩阵中不得重新估计。队列在第一个
+PKU cell 前检查 helpful RM 的 `50051` 和 harmless CM 的 `50052`；若本地端口未就绪，
+默认分别在 GPU 0、1 启动两个 owned server，队列退出时只清理自己启动的进程。NEWS
+`50053` 服务在 opt-in 后同样按需启动；本机显存允许三项服务常驻，而训练固定使用
+GPU 2、3。端口、host 与 GPU 可通过 `HELPFUL_TARGET_*`、`HARMLESS_TARGET_*`、
+`SAFE_SERVER_GPUS` 和 `NEWS_SERVER_GPUS` 覆盖。
+
+> PKU 训练可以先进行，但当前 `amo_eval` 的 raw-logit、origin-reference、
+> pooled-prompt HV 不可作为正式主结论。正式评测应使用同一份 frozen calibration，
+> 在 policy mean/front 上计算 HV；另一种有效口径是对每个 prompt 生成 `n > 1`
+> responses 后计算 response-set HV，而不是把不同 prompt 混成一张前沿。
+
+任一 cell 失败时队列立即停止；每个实验默认保留最新 3 个 actor checkpoint，以兼顾
+故障回退与磁盘占用。
 
 进度记录在 `train_logs/priority_baselines/queue_progress.log`，各 cell 日志为
 上述唯一命名的 `.train.log`。

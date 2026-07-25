@@ -11,11 +11,18 @@ export AMO_PY=${AMO_PY:-/home/rihongqiu/data/miniconda3/envs/amo/bin/python}
 export TRAIN_GPUS=${TRAIN_GPUS:-2,3}
 export TRAINER_LOGGER=${TRAINER_LOGGER:-'["console"]'}
 NEWS_SERVER_GPUS=${NEWS_SERVER_GPUS:-0,1}
+SAFE_SERVER_GPUS=${SAFE_SERVER_GPUS:-0,1}
+export HELPFUL_TARGET_HOST=${HELPFUL_TARGET_HOST:-127.0.0.1}
+export HELPFUL_TARGET_PORT=${HELPFUL_TARGET_PORT:-50051}
+export HARMLESS_TARGET_HOST=${HARMLESS_TARGET_HOST:-127.0.0.1}
+export HARMLESS_TARGET_PORT=${HARMLESS_TARGET_PORT:-50052}
+SAFE_HELPFUL_MODEL_PATH=${SAFE_HELPFUL_MODEL_PATH:-$WORKSPACE/playground/reward_model/checkpoints/Qwen2.5-7B-SafeRLHF-RM}
+SAFE_HARMLESS_MODEL_PATH=${SAFE_HARMLESS_MODEL_PATH:-$WORKSPACE/playground/reward_model/checkpoints/Qwen2.5-7B-SafeRLHF-CM}
 MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}
 MODEL=${BASELINE_MODEL:-1.5b}
 
 DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"
-DEFAULT_DATASETS="math-lighteval news rlla"
+DEFAULT_DATASETS="math-lighteval pku-saferlhf rlla"
 METHODS_INPUT=${BASELINE_METHODS:-$DEFAULT_METHODS}
 DATASETS_INPUT=${BASELINE_DATASETS:-$DEFAULT_DATASETS}
 METHODS_INPUT=${METHODS_INPUT//,/ }
@@ -34,6 +41,8 @@ MARKER_DIR=$LOGDIR/completed_train
 LEDGER=$LOGDIR/queue_progress.log
 STATUS_FILE=$LOGDIR/queue.status
 NEWS_LOG=$LOGDIR/news_server.log
+SAFE_HELPFUL_LOG=$LOGDIR/safe_helpful_server.log
+SAFE_HARMLESS_LOG=$LOGDIR/safe_harmless_server.log
 mkdir -p "$MARKER_DIR"
 
 exec 9>"$LOGDIR/queue.lock"
@@ -49,6 +58,7 @@ log() {
 project_for_dataset() {
     case "$1" in
         math-lighteval) echo amo_math-lighteval ;;
+        pku-saferlhf) echo amo_pku-saferlhf ;;
         news) echo amo_cnn_dailymail ;;
         rlla) echo amo_rlla ;;
         *) return 1 ;;
@@ -58,6 +68,7 @@ project_for_dataset() {
 results_dir_for_dataset() {
     case "$1" in
         math-lighteval) echo MATH-LightEval ;;
+        pku-saferlhf) echo PKU-SafeRLHF ;;
         news) echo CNN_DailyMail ;;
         rlla) echo RLLA ;;
         *) return 1 ;;
@@ -91,7 +102,7 @@ set_cell_variants() {
                 h2w1100 h2w1010 h2w1001 h2w0110 h2w0101 h2w0011
             )
             ;;
-        rlla)
+        pku-saferlhf|rlla)
             CELL_VARIANTS+=(h2w20 h2w02)
             ;;
         *)
@@ -102,13 +113,16 @@ set_cell_variants() {
 }
 
 port_ready() {
-    "$AMO_PY" -c 'import socket; s=socket.create_connection(("127.0.0.1", 50053), timeout=1); s.close()' >/dev/null 2>&1
+    local host=$1
+    local port=$2
+    "$AMO_PY" -c 'import socket,sys; s=socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=1); s.close()' \
+        "$host" "$port" >/dev/null 2>&1
 }
 
 NEWS_SERVER_PID=""
 NEWS_SERVER_OWNED=0
 ensure_news_server() {
-    if port_ready; then
+    if port_ready 127.0.0.1 50053; then
         log "NEWS server already ready on 127.0.0.1:50053; reusing it"
         return 0
     fi
@@ -130,7 +144,7 @@ ensure_news_server() {
             log "NEWS server exited before becoming ready (see $NEWS_LOG)"
             return 1
         fi
-        if port_ready; then
+        if port_ready 127.0.0.1 50053; then
             log "NEWS server ready (pid=$NEWS_SERVER_PID)"
             return 0
         fi
@@ -140,14 +154,116 @@ ensure_news_server() {
     return 1
 }
 
+SAFE_HELPFUL_SERVER_PID=""
+SAFE_HELPFUL_SERVER_OWNED=0
+SAFE_HARMLESS_SERVER_PID=""
+SAFE_HARMLESS_SERVER_OWNED=0
+
+is_local_host() {
+    case "$1" in
+        localhost|127.0.0.1|::1) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+start_safe_server() {
+    local label=$1
+    local model_path=$2
+    local host=$3
+    local port=$4
+    local gpu=$5
+    local server_log=$6
+
+    is_local_host "$host" || {
+        log "$label target $host:$port is remote and not ready; refusing to start it locally"
+        return 1
+    }
+    [[ -d $model_path ]] || {
+        log "$label model path is missing: $model_path"
+        return 1
+    }
+
+    log "$label server starting on GPU $gpu at $host:$port -> $server_log"
+    (
+        exec 9>&-
+        cd "$WORKSPACE/recipe/amo_safe"
+        export CUDA_VISIBLE_DEVICES=$gpu
+        export XFORMERS_IGNORE_FLASH_VERSION_CHECK=1
+        exec "$AMO_PY" reward_server.py --model_path "$model_path" --port "$port"
+    ) >> "$server_log" 2>&1 &
+    STARTED_SAFE_SERVER_PID=$!
+}
+
+ensure_safe_servers() {
+    local safe_helpful_gpu safe_harmless_gpu safe_extra_gpu
+    IFS=',' read -r safe_helpful_gpu safe_harmless_gpu safe_extra_gpu <<< "$SAFE_SERVER_GPUS"
+    if [[ -z $safe_helpful_gpu || -z $safe_harmless_gpu || -n ${safe_extra_gpu:-} ]]; then
+        log "SAFE_SERVER_GPUS must contain exactly two comma-separated GPU ids"
+        return 1
+    fi
+
+    local helpful_ready=0
+    local harmless_ready=0
+    port_ready "$HELPFUL_TARGET_HOST" "$HELPFUL_TARGET_PORT" && helpful_ready=1
+    port_ready "$HARMLESS_TARGET_HOST" "$HARMLESS_TARGET_PORT" && harmless_ready=1
+    if [[ $helpful_ready == 1 && $harmless_ready == 1 ]]; then
+        log "SAFE servers already ready on $HELPFUL_TARGET_HOST:$HELPFUL_TARGET_PORT and $HARMLESS_TARGET_HOST:$HARMLESS_TARGET_PORT; reusing them"
+        return 0
+    fi
+
+    if [[ $helpful_ready == 0 ]]; then
+        start_safe_server helpful "$SAFE_HELPFUL_MODEL_PATH" "$HELPFUL_TARGET_HOST" \
+            "$HELPFUL_TARGET_PORT" "$safe_helpful_gpu" "$SAFE_HELPFUL_LOG"
+        SAFE_HELPFUL_SERVER_PID=$STARTED_SAFE_SERVER_PID
+        SAFE_HELPFUL_SERVER_OWNED=1
+    fi
+    if [[ $harmless_ready == 0 ]]; then
+        start_safe_server harmless "$SAFE_HARMLESS_MODEL_PATH" "$HARMLESS_TARGET_HOST" \
+            "$HARMLESS_TARGET_PORT" "$safe_harmless_gpu" "$SAFE_HARMLESS_LOG"
+        SAFE_HARMLESS_SERVER_PID=$STARTED_SAFE_SERVER_PID
+        SAFE_HARMLESS_SERVER_OWNED=1
+    fi
+
+    local attempt
+    for ((attempt=1; attempt<=180; attempt++)); do
+        if [[ $SAFE_HELPFUL_SERVER_OWNED == 1 ]] && ! kill -0 "$SAFE_HELPFUL_SERVER_PID" 2>/dev/null; then
+            log "helpful server exited before becoming ready (see $SAFE_HELPFUL_LOG)"
+            return 1
+        fi
+        if [[ $SAFE_HARMLESS_SERVER_OWNED == 1 ]] && ! kill -0 "$SAFE_HARMLESS_SERVER_PID" 2>/dev/null; then
+            log "harmless server exited before becoming ready (see $SAFE_HARMLESS_LOG)"
+            return 1
+        fi
+        if port_ready "$HELPFUL_TARGET_HOST" "$HELPFUL_TARGET_PORT" && \
+            port_ready "$HARMLESS_TARGET_HOST" "$HARMLESS_TARGET_PORT"; then
+            log "SAFE servers ready (helpful pid=${SAFE_HELPFUL_SERVER_PID:-external}; harmless pid=${SAFE_HARMLESS_SERVER_PID:-external})"
+            return 0
+        fi
+        sleep 5
+    done
+    log "SAFE servers did not both become ready within 15 minutes"
+    return 1
+}
+
+stop_owned_server() {
+    local owned=$1
+    local pid=$2
+    local label=$3
+    if [[ $owned == 1 && -n $pid ]]; then
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+        fi
+        wait "$pid" 2>/dev/null || true
+        log "$label server released (pid=$pid)"
+    fi
+}
+
 cleanup() {
     local rc=$?
     trap - EXIT INT TERM
-    if [[ $NEWS_SERVER_OWNED == 1 && -n $NEWS_SERVER_PID ]] && kill -0 "$NEWS_SERVER_PID" 2>/dev/null; then
-        kill "$NEWS_SERVER_PID" 2>/dev/null || true
-        wait "$NEWS_SERVER_PID" 2>/dev/null || true
-        log "NEWS server stopped (pid=$NEWS_SERVER_PID)"
-    fi
+    stop_owned_server "$NEWS_SERVER_OWNED" "$NEWS_SERVER_PID" NEWS
+    stop_owned_server "$SAFE_HELPFUL_SERVER_OWNED" "$SAFE_HELPFUL_SERVER_PID" helpful
+    stop_owned_server "$SAFE_HARMLESS_SERVER_OWNED" "$SAFE_HARMLESS_SERVER_PID" harmless
     printf "finished rc=%s time=%s\n" "$rc" "$(date '+%F %T')" > "$STATUS_FILE"
     exit "$rc"
 }
@@ -165,7 +281,7 @@ log "=== priority baseline queue START pid=$$ ==="
 log "model: $MODEL_TAG"
 log "methods: ${METHODS[*]}"
 log "datasets (inside each method): ${DATASETS[*]}"
-log "training GPUs: $TRAIN_GPUS; NEWS server GPUs: $NEWS_SERVER_GPUS"
+log "training GPUs: $TRAIN_GPUS; SAFE server GPUs: $SAFE_SERVER_GPUS; NEWS server GPUs: $NEWS_SERVER_GPUS"
 log "actor checkpoint retention: $MAX_ACTOR_CKPTS"
 
 for method in "${METHODS[@]}"; do
@@ -203,6 +319,9 @@ for method in "${METHODS[@]}"; do
             if [[ -s $marker && -s $latest ]]; then
                 log "SKIP $cell_label (training marker and checkpoint exist)"
                 continue
+            fi
+            if [[ $dataset == pku-saferlhf ]]; then
+                ensure_safe_servers
             fi
             if [[ $dataset == news ]]; then
                 ensure_news_server

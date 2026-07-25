@@ -28,6 +28,7 @@ METHOD_CONFIGS = {
 METHODS = set(METHOD_CONFIGS)
 H2_WEIGHT_VARIANTS = {
     "math-lighteval": ("h2w200", "h2w020", "h2w002", "h2w110", "h2w101", "h2w011"),
+    "pku-saferlhf": ("h2w20", "h2w02"),
     "news": (
         "h2w2000",
         "h2w0200",
@@ -185,7 +186,7 @@ def test_ls_and_weighted_gdpo_h2_sweeps_dry_run_with_unique_checkpoints():
                 assert checkpoint not in checkpoints
                 checkpoints.add(checkpoint)
 
-    assert len(checkpoints) == 42
+    assert len(checkpoints) == 48
 
 
 def test_h2_weight_variants_are_strictly_validated_in_dry_run():
@@ -193,6 +194,7 @@ def test_h2_weight_variants_are_strictly_validated_in_dry_run():
         ("math-lighteval", "h2w20"),
         ("math-lighteval", "h2w300"),
         ("math-lighteval", "h2w100"),
+        ("pku-saferlhf", "h2w11"),
         ("rlla", "h2w11"),
         ("rlla", "weights20"),
     )
@@ -217,7 +219,11 @@ def test_priority_queue_declares_order_and_isolates_variant_identity():
         'DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo ctwa lagrangian '
         'fair_stable mgda gapo dynamic_hv nsga2 smsemoa"'
     ) in source
+    assert 'DEFAULT_DATASETS="math-lighteval pku-saferlhf rlla"' in source
     assert 'MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}' in source
+    assert 'pku-saferlhf) echo amo_pku-saferlhf' in source
+    assert 'pku-saferlhf) echo PKU-SafeRLHF' in source
+    assert 'pku-saferlhf|rlla)' in source
     execution = source.index('log "=== priority baseline queue START')
     method_loop = source.index('for method in "${METHODS[@]}"', execution)
     dataset_loop = source.index('for dataset in "${DATASETS[@]}"', method_loop)
@@ -225,4 +231,18 @@ def test_priority_queue_declares_order_and_isolates_variant_identity():
     assert method_loop < dataset_loop < variant_loop
     assert 'TRAINER_VARIANT="$variant" EXPERIMENT_NAME="$experiment" CHECKPOINT_DIR="$checkpoint_dir"' in source
     assert 'method=%s dataset=%s experiment=%s variant=%s checkpoint=%s' in source
-    assert "exec 9>&-" in source
+    assert source.count("exec 9>&-") >= 2
+    assert 'HELPFUL_TARGET_PORT=${HELPFUL_TARGET_PORT:-50051}' in source
+    assert 'HARMLESS_TARGET_PORT=${HARMLESS_TARGET_PORT:-50052}' in source
+    assert "Qwen2.5-7B-SafeRLHF-RM" in source
+    assert "Qwen2.5-7B-SafeRLHF-CM" in source
+    assert "ensure_safe_servers" in source
+    assert 'if [[ $dataset == pku-saferlhf ]]' in source
+    assert (
+        'stop_owned_server "$SAFE_HELPFUL_SERVER_OWNED" '
+        '"$SAFE_HELPFUL_SERVER_PID" helpful'
+    ) in source
+    assert (
+        'stop_owned_server "$SAFE_HARMLESS_SERVER_OWNED" '
+        '"$SAFE_HARMLESS_SERVER_PID" harmless'
+    ) in source
