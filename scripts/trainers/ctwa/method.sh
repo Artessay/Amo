@@ -11,7 +11,9 @@ configure_method() {
 
     case "$DATASET" in
         math-lighteval) METHOD_OVERRIDES+=("amo_strategy.adaptive_config.cov_targets=[0.0,0.0,0.0]") ;;
+        news) METHOD_OVERRIDES+=("amo_strategy.adaptive_config.cov_targets=[0.0,0.0,0.0,0.0]") ;;
         pku-saferlhf) METHOD_OVERRIDES+=("amo_strategy.adaptive_config.cov_targets=[0.0,0.0]") ;;
+        rlla) METHOD_OVERRIDES+=("amo_strategy.adaptive_config.cov_targets=[0.0,0.0]") ;;
         *) die "CTWA has no covariance target defaults for dataset '$DATASET'" ;;
     esac
 }

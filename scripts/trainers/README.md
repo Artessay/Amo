@@ -43,7 +43,8 @@ scripts/trainers/
 ├── grpo/ ... smsemoa/          # 15 个方法目录；method.sh + 数据集入口
 ├── hvpo/ablations/             # HVPO 的 MATH-LightEval 消融入口
 ├── orchestration/
-│   └── run_safe_matrix.sh      # PKU-SafeRLHF 串行矩阵
+│   ├── run_safe_matrix.sh      # PKU-SafeRLHF 串行矩阵
+│   └── run_priority_baselines.sh # 强 trade-off 数据集的 baseline 优先队列
 └── tools/
     ├── calibrate_safe.py       # 冻结安全奖励标定
     ├── eval_safe.sh            # 单个安全实验的合并、生成与评分
@@ -72,18 +73,38 @@ scripts/trainers/
 | `nsga2` | NSGA-II-style credit | `grpo` | `amo_pareto` |
 | `smsemoa` | SMS-EMOA-style credit | `grpo` | `amo_pareto` |
 
-`grpo`、`gdpo`、`hvpo` 支持全部六个数据集；其余 12 个方法当前支持 `math-lighteval` 与 `pku-saferlhf`。
+`grpo`、`gdpo`、`hvpo` 支持全部六个数据集；其余 12 个方法支持
+`math-lighteval`、`pku-saferlhf`、`rlla` 与 `news`。
 
 | dataset id / 入口后缀 | 数据目录 | 支持的方法 |
 |---|---|---|
 | `math-lighteval` | `data/MATH-LightEval` | 全部 15 个方法 |
 | `pku-saferlhf` | `data/PKU-SafeRLHF` | 全部 15 个方法 |
+| `rlla` | `data/RLLA` | 全部 15 个方法 |
+| `news` | `data/CNN_DailyMail` | 全部 15 个方法 |
 | `math-500` | `data/MATH-500` | GRPO、GDPO、HVPO |
 | `paradetox` | `data/ParaDetox` | GRPO、GDPO、HVPO |
-| `rlla` | `data/RLLA` | GRPO、GDPO、HVPO |
-| `news` | `data/CNN_DailyMail` | GRPO、GDPO、HVPO |
 
 不存在的 `run_<dataset>.sh` 组合即尚未定义默认参数，不应直接调用内部 `launch.sh` 绕过该限制。
+
+## Baseline 优先队列
+
+Qwen2.5-1.5B 的强 trade-off 队列使用 method-outer、dataset-inner 顺序：
+
+```bash
+mkdir -p train_logs/priority_baselines
+nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
+  > train_logs/priority_baselines/nohup.log 2>&1 &
+```
+
+默认 baseline 顺序为
+`ls -> tchebycheff -> gdpo_weighted -> rvpo -> mgda -> gapo -> lagrangian -> fair_stable -> ctwa -> dynamic_hv -> nsga2 -> smsemoa`；
+每个方法依次跑 `math-lighteval -> news -> rlla`，全部成功后才进入下一方法。
+任一 cell 失败时队列立即停止。News reward server 使用 GPU 0、1，训练使用
+GPU 2、3；每个实验只保留最新 1 个 actor checkpoint，以控制磁盘占用。
+
+进度记录在 `train_logs/priority_baselines/queue_progress.log`，各 cell 日志为
+`<method>.<dataset>.train.log`。
 
 ## Profile 与覆盖顺序
 

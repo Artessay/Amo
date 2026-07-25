@@ -14,9 +14,15 @@ configure_method() {
         math-lighteval)
             METHOD_OVERRIDES+=("amo_strategy.adaptive_config.budgets=[0.0,0.5,0.5]")
             ;;
+        news)
+            METHOD_OVERRIDES+=("amo_strategy.adaptive_config.budgets=[0.0,0.5,0.5,0.5]")
+            ;;
         pku-saferlhf)
             load_safe_calibration
             METHOD_OVERRIDES+=("amo_strategy.adaptive_config.budgets=[0.0,$SAFE_HARMLESS_BUDGET]")
+            ;;
+        rlla)
+            METHOD_OVERRIDES+=("amo_strategy.adaptive_config.budgets=[0.0,0.5]")
             ;;
         *)
             die "Lagrangian has no calibrated defaults for dataset '$DATASET'"
