@@ -28,4 +28,7 @@ configure_dataset() {
             PROFILE_MICRO_BATCH_SIZE_PER_GPU=16
             ;;
     esac
+
+    # CNN/DailyMail is capped explicitly because even one full epoch is large.
+    DATASET_OVERRIDES+=("trainer.total_training_steps=100")
 }
