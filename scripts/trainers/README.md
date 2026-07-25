@@ -27,7 +27,7 @@ bash scripts/trainers/hvpo/run_math-lighteval.sh 1.5b
 bash scripts/trainers/gdpo/run_pku-saferlhf.sh llama3b 2
 
 # 只检查最终命令，不启动训练
-bash scripts/trainers/ls/run_math-lighteval.sh 3b 1 --dry-run \
+bash scripts/trainers/grpo/run_math-lighteval.sh 3b 1 --dry-run \
   data.train_batch_size=64 actor_rollout_ref.rollout.n=2
 ```
 
@@ -53,16 +53,14 @@ scripts/trainers/
 
 ## 方法与数据集
 
-全部 15 个方法如下。目录名同时也是默认实验名中的 method tag。
+全部 13 个方法如下。目录名同时也是默认实验名中的 method tag。
 
 | 目录 | 方法 | `adv_estimator` | `reward_manager` |
 |---|---|---|---|
-| `grpo` | GRPO（等权） | `grpo` | `amo_vanilla` |
 | `gdpo` | GDPO | `gdpo` | `amo_vanilla` |
 | `hvpo` | HVPO | `hvpo` | `amo_hvpo` |
-| `ls` | Linear Scalarization / MORLHF | `grpo` | `amo_scalarize` |
+| `grpo` | GRPO（Linear Scalarization / MORLHF） | `grpo` | `amo_scalarize` |
 | `tchebycheff` | Augmented Tchebycheff | `grpo` | `amo_scalarize` |
-| `gdpo_weighted` | Weighted GDPO | `gdpo_weighted` | `amo_vanilla` |
 | `rvpo` | RVPO | `rvpo` | `amo_vanilla` |
 | `ctwa` | CTWA | `grpo` | `amo_adaptive` |
 | `lagrangian` | Lagrangian / Safe-RLHF | `grpo` | `amo_adaptive` |
@@ -73,19 +71,16 @@ scripts/trainers/
 | `nsga2` | NSGA-II-style credit | `grpo` | `amo_pareto` |
 | `smsemoa` | SMS-EMOA-style credit | `grpo` | `amo_pareto` |
 
-`grpo`、`gdpo`、`hvpo` 支持全部六个数据集；其余 12 个方法支持
-`math-lighteval`、`pku-saferlhf`、`rlla` 与 `news`。
 
-| dataset id / 入口后缀 | 数据目录 | 支持的方法 |
-|---|---|---|
-| `math-lighteval` | `data/MATH-LightEval` | 全部 15 个方法 |
-| `pku-saferlhf` | `data/PKU-SafeRLHF` | 全部 15 个方法 |
-| `rlla` | `data/RLLA` | 全部 15 个方法 |
-| `news` | `data/CNN_DailyMail` | 全部 15 个方法 |
-| `math-500` | `data/MATH-500` | GRPO、GDPO、HVPO |
-| `paradetox` | `data/ParaDetox` | GRPO、GDPO、HVPO |
+| dataset id / 入口后缀 | 数据目录 |
+|---|---|
+| `math-lighteval` | `data/MATH-LightEval` |
+| `pku-saferlhf` | `data/PKU-SafeRLHF` |
+| `rlla` | `data/RLLA` |
+| `news` | `data/CNN_DailyMail` |
+| `math-500` | `data/MATH-500` |
+| `paradetox` | `data/ParaDetox` |
 
-不存在的 `run_<dataset>.sh` 组合即尚未定义默认参数，不应直接调用内部 `launch.sh` 绕过该限制。
 
 ## Baseline 优先队列
 
@@ -98,7 +93,6 @@ nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
 ```
 
 默认 baseline 顺序为
-`ls -> tchebycheff -> gdpo_weighted -> rvpo -> ctwa -> lagrangian -> fair_stable -> mgda -> gapo -> dynamic_hv -> nsga2 -> smsemoa`；
 每个方法默认依次跑 `math-lighteval -> pku-saferlhf -> rlla`，一个数据集的全部 variant
 完成后再进入下一个数据集，全部数据集成功后才进入下一方法。
 
@@ -116,10 +110,9 @@ nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
   `BASELINE_DATASETS="math-lighteval pku-saferlhf rlla news"`，其 mapping、权重网格和
   reward server 仍完整保留。
 
-HelpSteer2 尚未进入统一 baseline/评测矩阵，ParaDetox 目前也只覆盖 GRPO、GDPO、HVPO；
-两者暂缓，先完成上述默认矩阵。
+HelpSteer2 尚未进入统一 baseline/评测矩阵。ParaDetox 已提供全部方法的训练入口，
+但尚未纳入默认优先队列。
 
-这是一个 H=2 + centroid 的 sparse pilot：`ls` 和 `gdpo_weighted` 在每个数据集
 先跑无 suffix 的 uniform centroid（保留历史 identity）。MATH-LightEval、PKU-SafeRLHF、
 RLLA、NEWS 的 centroid 依次为 `[1/3,1/3,1/3]`、`[0.5,0.5]`、`[0.5,0.5]`、
 `[0.25,0.25,0.25,0.25]`。随后共用 H=2 非均匀权重网格：
@@ -134,7 +127,6 @@ digit 顺序分别为 MATH-LightEval 的 `accuracy/conciseness/format`、PKU-Saf
 `safe_helpfulness/safe_harmlessness`、RLLA 的 `tool_correctness/tool_format`、
 NEWS 的 `coherence/fluency/relevance/consistency`。
 例如 `h2w101` 生成 `[0.5,0.0,0.5]`。uniform 实验继续使用
-`qwen2.5-1.5b_ls` / `qwen2.5-1.5b_gdpo_weighted`，非均匀实验则追加
 variant suffix。checkpoint、result、完成 marker 和训练日志均使用该唯一 suffix；
 base 日志仍为 `<method>.<dataset>.train.log`，sweep 日志为
 `<method>.<dataset>.<variant>.train.log`。
@@ -241,7 +233,7 @@ dry run 会完成 profile 解析、路径检查与命令组装，打印 shell-es
 bash scripts/trainers/gdpo/run_news.sh llama3b 10 --dry-run
 ```
 
-普通数据集在 dry run 时只警告缺失的数据/模型路径。PKU-SafeRLHF 的 `ls`、`tchebycheff`、`lagrangian`、`dynamic_hv` 需要读取冻结的 `results/PKU-SafeRLHF/safe_calibration.json`，因此即使 dry run，该文件也必须存在。
+普通数据集在 dry run 时只警告缺失的数据/模型路径。PKU-SafeRLHF 的 `grpo`、`tchebycheff`、`lagrangian`、`dynamic_hv` 需要读取冻结的 `results/PKU-SafeRLHF/safe_calibration.json`，因此即使 dry run，该文件也必须存在。
 
 ## HVPO 消融
 

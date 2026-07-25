@@ -21,7 +21,7 @@ SAFE_HARMLESS_MODEL_PATH=${SAFE_HARMLESS_MODEL_PATH:-$WORKSPACE/playground/rewar
 MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}
 MODEL=${BASELINE_MODEL:-1.5b}
 
-DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"
+DEFAULT_METHODS="grpo tchebycheff rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"
 DEFAULT_DATASETS="math-lighteval pku-saferlhf rlla"
 METHODS_INPUT=${BASELINE_METHODS:-$DEFAULT_METHODS}
 DATASETS_INPUT=${BASELINE_DATASETS:-$DEFAULT_DATASETS}
@@ -77,7 +77,7 @@ results_dir_for_dataset() {
 
 validate_method() {
     case "$1" in
-        ls|tchebycheff|gdpo_weighted|rvpo|ctwa|lagrangian|fair_stable|mgda|gapo|dynamic_hv|nsga2|smsemoa) ;;
+        grpo|tchebycheff|rvpo|ctwa|lagrangian|fair_stable|mgda|gapo|dynamic_hv|nsga2|smsemoa) ;;
         *) echo "unsupported baseline: $1" >&2; return 1 ;;
     esac
 }
@@ -88,7 +88,7 @@ set_cell_variants() {
     local method=$1
     local dataset=$2
     CELL_VARIANTS=("")
-    if [[ $method != ls && $method != gdpo_weighted ]]; then
+    if [[ $method != grpo ]]; then
         return 0
     fi
 

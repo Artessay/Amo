@@ -10,12 +10,12 @@
 #
 # Usage:
 #   bash scripts/trainers/tools/eval_safe.sh <EXP> [MODEL]
-#     EXP   : experiment name, e.g. qwen2.5-1.5b_ls
+#     EXP   : experiment name, e.g. qwen2.5-1.5b_grpo
 #     MODEL : 1.5b | 3b | llama3b (inferred from EXP when omitted)
 set -x
 set -e
 
-EXP=${1:?need EXPERIMENT_NAME e.g. qwen2.5-1.5b_ls}
+EXP=${1:?need EXPERIMENT_NAME e.g. qwen2.5-1.5b_grpo}
 MODEL=${2:-}
 
 PROJECT=amo_pku-saferlhf

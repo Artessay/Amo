@@ -9,12 +9,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TRAINERS = ROOT / "scripts" / "trainers"
 METHOD_CONFIGS = {
-    "grpo": ("grpo", "amo_vanilla"),
     "gdpo": ("gdpo", "amo_vanilla"),
     "hvpo": ("hvpo", "amo_hvpo"),
-    "ls": ("grpo", "amo_scalarize"),
+    "grpo": ("grpo", "amo_scalarize"),
     "tchebycheff": ("grpo", "amo_scalarize"),
-    "gdpo_weighted": ("gdpo_weighted", "amo_vanilla"),
     "rvpo": ("rvpo", "amo_vanilla"),
     "mgda": ("mgda", "amo_vanilla"),
     "gapo": ("gapo", "amo_vanilla"),
@@ -77,6 +75,14 @@ def test_unified_method_layout_has_no_legacy_trainer_trees():
         assert not (ROOT / "scripts" / legacy).exists()
 
 
+def test_every_method_supports_math500_and_paradetox():
+    for method in METHODS:
+        for dataset in ("math-500", "paradetox"):
+            entry = TRAINERS / method / f"run_{dataset}.sh"
+            assert entry.is_file(), f"missing public entry: {entry}"
+            assert os.access(entry, os.X_OK), f"entry is not executable: {entry}"
+
+
 def test_every_public_entry_dry_runs():
     entries = sorted(
         script
@@ -120,7 +126,7 @@ def test_every_method_resolves_its_estimator_and_reward_manager():
 
 
 def test_safe_calibration_and_hvpo_variant_are_resolved():
-    safe = run_entry(TRAINERS / "ls" / "run_pku-saferlhf.sh", "3b", "--dry-run")
+    safe = run_entry(TRAINERS / "grpo" / "run_pku-saferlhf.sh", "3b", "--dry-run")
     assert safe.returncode == 0, safe.stderr
     assert "amo_strategy.scalarize_config.normalize=affine" in safe.stdout
     assert "trainer.default_local_dir=" in safe.stdout
@@ -151,10 +157,9 @@ def _checkpoint_from_dry_run(result: subprocess.CompletedProcess[str]) -> str:
     )
 
 
-def test_ls_and_weighted_gdpo_h2_sweeps_dry_run_with_unique_checkpoints():
+def test_grpo_linear_scalarization_h2_sweep_dry_runs_with_unique_checkpoints():
     method_weight_keys = {
-        "ls": "amo_strategy.scalarize_config.weights",
-        "gdpo_weighted": "algorithm.amo_objective_weights",
+        "grpo": "amo_strategy.scalarize_config.weights",
     }
     checkpoints: set[str] = set()
 
@@ -186,7 +191,7 @@ def test_ls_and_weighted_gdpo_h2_sweeps_dry_run_with_unique_checkpoints():
                 assert checkpoint not in checkpoints
                 checkpoints.add(checkpoint)
 
-    assert len(checkpoints) == 48
+    assert len(checkpoints) == 24
 
 
 def test_h2_weight_variants_are_strictly_validated_in_dry_run():
@@ -198,7 +203,7 @@ def test_h2_weight_variants_are_strictly_validated_in_dry_run():
         ("rlla", "h2w11"),
         ("rlla", "weights20"),
     )
-    for method in ("ls", "gdpo_weighted"):
+    for method in ("grpo",):
         for dataset, variant in invalid_cases:
             result = run_entry(
                 TRAINERS / method / f"run_{dataset}.sh",
@@ -215,10 +220,7 @@ def test_priority_queue_declares_order_and_isolates_variant_identity():
     assert syntax.returncode == 0, syntax.stderr
 
     source = queue.read_text()
-    assert (
-        'DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo ctwa lagrangian '
-        'fair_stable mgda gapo dynamic_hv nsga2 smsemoa"'
-    ) in source
+    assert 'DEFAULT_METHODS="grpo tchebycheff rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"' in source
     assert 'DEFAULT_DATASETS="math-lighteval pku-saferlhf rlla"' in source
     assert 'MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}' in source
     assert 'pku-saferlhf) echo amo_pku-saferlhf' in source

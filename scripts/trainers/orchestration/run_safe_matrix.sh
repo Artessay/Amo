@@ -29,7 +29,7 @@ mkdir -p "$LOGDIR"
 LEDGER=$LOGDIR/matrix_progress.log
 
 MODELS_IN=${1:-"1.5b 3b llama3b"}
-METHODS_IN=${2:-"grpo gdpo hvpo ls tchebycheff gdpo_weighted rvpo mgda gapo lagrangian fair_stable ctwa dynamic_hv nsga2 smsemoa"}
+METHODS_IN=${2:-"grpo gdpo hvpo tchebycheff rvpo mgda gapo lagrangian fair_stable ctwa dynamic_hv nsga2 smsemoa"}
 EPOCH=${3:-1}
 MODELS=$(echo "$MODELS_IN" | tr ',' ' ')
 METHODS=$(echo "$METHODS_IN" | tr ',' ' ')
@@ -66,7 +66,7 @@ for MODEL in $MODELS; do
     fi
 
     case "$METHOD" in
-      grpo|gdpo|hvpo|ls|tchebycheff|gdpo_weighted|rvpo|mgda|gapo|lagrangian|fair_stable|ctwa|dynamic_hv|nsga2|smsemoa) ;;
+      gdpo|hvpo|grpo|tchebycheff|rvpo|mgda|gapo|lagrangian|fair_stable|ctwa|dynamic_hv|nsga2|smsemoa) ;;
       *) log "TRAIN FAIL $EXP (unsupported method: $METHOD)"; FAIL=$((FAIL+1)); continue ;;
     esac
     METHOD_SCRIPT=$WORKSPACE/scripts/trainers/$METHOD/run_pku-saferlhf.sh

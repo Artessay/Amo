@@ -15,11 +15,11 @@ llama3b  -> llama3.2-3b
 方法：
 
 ```text
-grpo gdpo hvpo ls tchebycheff gdpo_weighted rvpo mgda gapo
+grpo gdpo hvpo tchebycheff rvpo mgda gapo
 lagrangian fair_stable ctwa dynamic_hv nsga2 smsemoa
 ```
 
-每个 cell 的默认身份为 `<model_tag>_<method>`，例如 `qwen2.5-1.5b_ls`。
+每个 cell 的默认身份为 `<model_tag>_<method>`，例如 `qwen2.5-1.5b_grpo`。
 
 ## 运行前准备
 
@@ -67,7 +67,7 @@ bash scripts/amo_exp/serve_rewards.sh stop
 
 ## 生成并冻结 calibration
 
-安全奖励是无界 reward-model logits。`ls`、`tchebycheff`、`lagrangian` 与 `dynamic_hv` 必须共享同一份冻结标定：
+安全奖励是无界 reward-model logits。`grpo`、`tchebycheff`、`lagrangian` 与 `dynamic_hv` 必须共享同一份冻结标定：
 
 ```bash
 ${AMO_PY:-python3} scripts/trainers/tools/calibrate_safe.py --n 512 --seed 0
@@ -86,7 +86,7 @@ results/PKU-SafeRLHF/safe_calibration.json
 ## 先 dry-run 一个 cell
 
 ```bash
-bash scripts/trainers/ls/run_pku-saferlhf.sh 1.5b 1 --dry-run
+bash scripts/trainers/grpo/run_pku-saferlhf.sh 1.5b 1 --dry-run
 ```
 
 这会打印最终训练命令但不启动训练。上述四个 scale-sensitive 方法在 dry run 时仍需读取 `safe_calibration.json`。
@@ -165,7 +165,7 @@ bash scripts/trainers/orchestration/run_safe_matrix.sh "1.5b"
 
 # 一个模型、指定方法
 bash scripts/trainers/orchestration/run_safe_matrix.sh \
-  "3b" "grpo gdpo hvpo ls tchebycheff" 1
+  "3b" "grpo gdpo hvpo tchebycheff" 1
 
 # 逗号分隔也可用
 bash scripts/trainers/orchestration/run_safe_matrix.sh \
