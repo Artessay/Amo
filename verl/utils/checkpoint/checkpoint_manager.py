@@ -14,7 +14,10 @@
 
 import os
 import random
+import re
 import shutil
+import stat
+import uuid
 
 import numpy as np
 import torch
@@ -24,6 +27,255 @@ from transformers import PreTrainedTokenizer, ProcessorMixin
 
 from verl.trainer.config import CheckpointConfig
 from verl.utils.device import get_device_name, get_torch_device
+
+
+# Match the canonical name produced by the trainer. Reject aliases such as
+# ``global_step_020`` so they can never displace ``global_step_20`` during
+# retention while the tracker still points to the canonical path.
+_GLOBAL_STEP_DIR_PATTERN = re.compile(r"^global_step_(0|[1-9]\d*)$")
+GLOBAL_STEP_COMPLETED_MARKER = ".checkpoint_complete"
+
+
+def fsync_directory(path: str) -> None:
+    """Persist directory-entry updates made before this call."""
+    directory_fd = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def mark_global_step_checkpoint_complete(
+    checkpoint_root: str,
+    global_step: int,
+    required_components: tuple[str, ...] = ("actor",),
+) -> str:
+    """Atomically mark a fully written global checkpoint as committed."""
+    if (
+        isinstance(global_step, bool)
+        or not isinstance(global_step, int)
+        or global_step < 0
+    ):
+        raise ValueError(f"global_step must be a non-negative integer, got {global_step!r}")
+
+    checkpoint_path = os.path.abspath(
+        os.path.join(checkpoint_root, f"global_step_{global_step}")
+    )
+    if not os.path.isdir(checkpoint_path) or os.path.islink(checkpoint_path):
+        raise FileNotFoundError(
+            f"cannot commit missing or unsafe checkpoint directory: {checkpoint_path}"
+        )
+    if not required_components:
+        raise ValueError("required_components must not be empty")
+    for component in required_components:
+        _validate_checkpoint_component(component)
+    if not _is_nonempty_regular_file(os.path.join(checkpoint_path, "data.pt")):
+        raise RuntimeError(f"cannot commit checkpoint without a complete data.pt: {checkpoint_path}")
+    missing_components = [
+        component
+        for component in required_components
+        if not _has_checkpoint_component(checkpoint_path, component)
+    ]
+    if missing_components:
+        raise RuntimeError(
+            f"cannot commit checkpoint with missing components {missing_components}: {checkpoint_path}"
+        )
+
+    marker_path = os.path.join(checkpoint_path, GLOBAL_STEP_COMPLETED_MARKER)
+    temp_marker_path = f"{marker_path}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+    try:
+        with open(temp_marker_path, "x", encoding="utf-8") as marker_file:
+            marker_file.write(f"{global_step}\n")
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+        os.replace(temp_marker_path, marker_path)
+        fsync_directory(checkpoint_path)
+    finally:
+        if os.path.exists(temp_marker_path):
+            os.remove(temp_marker_path)
+    return marker_path
+
+
+def _is_nonempty_regular_file(path: str) -> bool:
+    try:
+        file_stat = os.stat(path, follow_symlinks=False)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return stat.S_ISREG(file_stat.st_mode) and file_stat.st_size > 0
+
+
+def _has_commit_evidence(checkpoint_path: str, global_step: int) -> bool:
+    # A directory is committed only when both the atomic dataloader file and
+    # the explicit marker are present. Legacy checkpoints are migrated from
+    # the tracker by the trainer before rotation; arbitrary unmarked folders
+    # are never guessed to be complete from their shape or file size.
+    data_path = os.path.join(checkpoint_path, "data.pt")
+    marker_path = os.path.join(checkpoint_path, GLOBAL_STEP_COMPLETED_MARKER)
+    if not _is_nonempty_regular_file(data_path) or not _is_nonempty_regular_file(marker_path):
+        return False
+    try:
+        with open(marker_path, encoding="utf-8") as marker_file:
+            return int(marker_file.read().strip()) == global_step
+    except (OSError, ValueError):
+        return False
+
+
+def _validate_checkpoint_component(component: str) -> None:
+    if (
+        component in {"", ".", ".."}
+        or os.path.isabs(component)
+        or os.path.basename(component) != component
+        or os.path.normpath(component) != component
+    ):
+        raise ValueError(f"checkpoint component must be one directory name, got {component!r}")
+
+
+def _has_checkpoint_component(checkpoint_path: str, component: str) -> bool:
+    component_path = os.path.join(checkpoint_path, component)
+    return os.path.isdir(component_path) and not os.path.islink(component_path)
+
+
+def _scan_global_step_directories(
+    checkpoint_root: str, current_global_step: int
+) -> list[tuple[int, str]]:
+    checkpoint_root = os.path.abspath(checkpoint_root)
+    try:
+        entries = list(os.scandir(checkpoint_root))
+    except FileNotFoundError:
+        return []
+
+    checkpoints = []
+    for entry in entries:
+        match = _GLOBAL_STEP_DIR_PATTERN.fullmatch(entry.name)
+        if match is None or not entry.is_dir(follow_symlinks=False):
+            continue
+        step = int(match.group(1))
+        if step <= current_global_step:
+            checkpoints.append((step, os.path.abspath(entry.path)))
+    checkpoints.sort(key=lambda item: item[0])
+    return checkpoints
+
+
+def _remove_checkpoint_directories(checkpoints: list[tuple[int, str]]) -> list[str]:
+    removed = []
+    for _, path in sorted(checkpoints, key=lambda item: item[0]):
+        try:
+            shutil.rmtree(path)
+        except FileNotFoundError:
+            continue
+        removed.append(os.path.abspath(path))
+    return removed
+
+
+def prune_global_step_checkpoints(
+    checkpoint_root: str,
+    max_ckpt_to_keep: int,
+    current_global_step: int,
+    required_components: tuple[str, ...] = ("actor",),
+) -> list[str]:
+    """Keep the newest K usable global checkpoints and remove stale partials.
+
+    Only checkpoints up to ``current_global_step`` participate in rotation. A
+    committed, structurally complete current checkpoint must exist before
+    anything is removed. Future-step directories, aliases, and symlinks are
+    left untouched.
+
+    Returns the absolute paths that were removed, oldest first.
+    """
+    if (
+        isinstance(max_ckpt_to_keep, bool)
+        or not isinstance(max_ckpt_to_keep, int)
+        or max_ckpt_to_keep <= 0
+    ):
+        return []
+    if not required_components:
+        raise ValueError("required_components must not be empty")
+    for component in required_components:
+        _validate_checkpoint_component(component)
+
+    checkpoints = _scan_global_step_directories(checkpoint_root, current_global_step)
+    usable = []
+    stale = []
+    for step, path in checkpoints:
+        is_usable = _has_commit_evidence(path, step) and all(
+            _has_checkpoint_component(path, component) for component in required_components
+        )
+        (usable if is_usable else stale).append((step, path))
+
+    if not any(step == current_global_step for step, _ in usable):
+        return []
+    return _remove_checkpoint_directories(stale + usable[:-max_ckpt_to_keep])
+
+
+def prune_global_step_component_checkpoints(
+    checkpoint_root: str,
+    component: str,
+    max_ckpt_to_keep: int,
+    current_global_step: int,
+) -> list[str]:
+    """Remove an old actor or critic subtree while preserving its step folder."""
+    if (
+        isinstance(max_ckpt_to_keep, bool)
+        or not isinstance(max_ckpt_to_keep, int)
+        or max_ckpt_to_keep <= 0
+    ):
+        return []
+    _validate_checkpoint_component(component)
+
+    checkpoints = _scan_global_step_directories(checkpoint_root, current_global_step)
+    usable = []
+    stale = []
+    for step, checkpoint_path in checkpoints:
+        if not _has_checkpoint_component(checkpoint_path, component):
+            continue
+        component_path = os.path.join(checkpoint_path, component)
+        target = usable if _has_commit_evidence(checkpoint_path, step) else stale
+        target.append((step, component_path))
+
+    if not any(step == current_global_step for step, _ in usable):
+        return []
+
+    removed = []
+    for _, path in sorted(stale + usable[:-max_ckpt_to_keep], key=lambda item: item[0]):
+        try:
+            shutil.rmtree(path)
+        except FileNotFoundError:
+            continue
+        removed.append(os.path.abspath(path))
+    return removed
+
+
+def prune_unusable_global_step_checkpoints(
+    checkpoint_root: str,
+    current_global_step: int,
+    components: tuple[str, ...],
+) -> list[str]:
+    """Remove stale partials and step folders with no retained components."""
+    if not components:
+        raise ValueError("components must not be empty")
+    for component in components:
+        _validate_checkpoint_component(component)
+
+    checkpoints = _scan_global_step_directories(checkpoint_root, current_global_step)
+    current_is_complete = any(
+        step == current_global_step
+        and _has_commit_evidence(path, step)
+        and all(_has_checkpoint_component(path, component) for component in components)
+        for step, path in checkpoints
+    )
+    if not current_is_complete:
+        return []
+
+    unusable = []
+    for step, path in checkpoints:
+        if step == current_global_step:
+            continue
+        has_retained_component = any(
+            _has_checkpoint_component(path, component) for component in components
+        )
+        if not _has_commit_evidence(path, step) or not has_retained_component:
+            unusable.append((step, path))
+    return _remove_checkpoint_directories(unusable)
 
 
 class BaseCheckpointManager:

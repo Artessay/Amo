@@ -629,16 +629,20 @@ class MegatronCheckpointManager(BaseCheckpointManager):
                         )
 
         def finalize_save_fn():
-            # Rank 0 uploads checkpoint to HDFS if hdfs_path is provided
+            # Synchronous callers publish the global tracker only after every
+            # model component and dataloader state has succeeded. Async saves
+            # have no later driver-side completion point, so their callback
+            # retains the legacy tracker update.
             log_with_rank(
                 f"Dist checkpointing save completed for {dist_checkpoint_path}", rank=self.rank, logger=logger
             )
             if self.rank == 0:
-                local_latest_checkpointed_iteration = os.path.join(
-                    os.path.dirname(os.path.dirname(local_path)), "latest_checkpointed_iteration.txt"
-                )
-                with open(local_latest_checkpointed_iteration, "w") as f:
-                    f.write(str(global_step))
+                if self.checkpoint_config.async_save:
+                    local_latest_checkpointed_iteration = os.path.join(
+                        os.path.dirname(os.path.dirname(local_path)), "latest_checkpointed_iteration.txt"
+                    )
+                    with open(local_latest_checkpointed_iteration, "w") as f:
+                        f.write(str(global_step))
                 if hdfs_path is not None:
                     log_with_rank(f"Uploading checkpoint to {hdfs_path}", rank=self.rank, logger=logger)
                     from verl.utils import hdfs_io

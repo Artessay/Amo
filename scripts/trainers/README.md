@@ -64,11 +64,11 @@ scripts/trainers/
 | `tchebycheff` | Augmented Tchebycheff | `grpo` | `amo_scalarize` |
 | `gdpo_weighted` | Weighted GDPO | `gdpo_weighted` | `amo_vanilla` |
 | `rvpo` | RVPO | `rvpo` | `amo_vanilla` |
-| `mgda` | MGDA | `mgda` | `amo_vanilla` |
-| `gapo` | GAPO | `gapo` | `amo_vanilla` |
+| `ctwa` | CTWA | `grpo` | `amo_adaptive` |
 | `lagrangian` | Lagrangian / Safe-RLHF | `grpo` | `amo_adaptive` |
 | `fair_stable` | Fair-and-Stable | `grpo` | `amo_adaptive` |
-| `ctwa` | CTWA | `grpo` | `amo_adaptive` |
+| `mgda` | MGDA | `mgda` | `amo_vanilla` |
+| `gapo` | GAPO | `gapo` | `amo_vanilla` |
 | `dynamic_hv` | Dynamic-HV weighting | `grpo` | `amo_adaptive` |
 | `nsga2` | NSGA-II-style credit | `grpo` | `amo_pareto` |
 | `smsemoa` | SMS-EMOA-style credit | `grpo` | `amo_pareto` |
@@ -98,13 +98,32 @@ nohup bash scripts/trainers/orchestration/run_priority_baselines.sh \
 ```
 
 默认 baseline 顺序为
-`ls -> tchebycheff -> gdpo_weighted -> rvpo -> mgda -> gapo -> lagrangian -> fair_stable -> ctwa -> dynamic_hv -> nsga2 -> smsemoa`；
-每个方法依次跑 `math-lighteval -> news -> rlla`，全部成功后才进入下一方法。
+`ls -> tchebycheff -> gdpo_weighted -> rvpo -> ctwa -> lagrangian -> fair_stable -> mgda -> gapo -> dynamic_hv -> nsga2 -> smsemoa`；
+每个方法依次跑 `math-lighteval -> news -> rlla`，一个数据集的全部 variant
+完成后再进入下一个数据集，全部数据集成功后才进入下一方法。
+
+这是一个 H=2 + centroid 的 sparse pilot：`ls` 和 `gdpo_weighted` 在每个数据集
+先跑无 suffix 的 uniform centroid（保留历史 identity），其权重在 MATH-LightEval、
+NEWS、RLLA 上分别为 `[1/3,1/3,1/3]`、`[0.25,0.25,0.25,0.25]`、
+`[0.5,0.5]`。随后共用 H=2 非均匀权重网格，三个数据集分别有 6、10、2 个点：
+MATH-LightEval 为
+`h2w200 h2w020 h2w002 h2w110 h2w101 h2w011`，NEWS 为
+`h2w2000 h2w0200 h2w0020 h2w0002 h2w1100 h2w1010 h2w1001 h2w0110 h2w0101 h2w0011`，
+RLLA 为 `h2w20 h2w02`。`h2w` 后每位数字只能是 0、1、2，数字和必须为 2；
+实际权重为各位数字除以 2。digit 顺序分别为 MATH-LightEval 的
+`accuracy/conciseness/format`、NEWS 的 `coherence/fluency/relevance/consistency`、
+RLLA 的 `tool_correctness/tool_format`。
+例如 `h2w101` 生成 `[0.5,0.0,0.5]`。uniform 实验继续使用
+`qwen2.5-1.5b_ls` / `qwen2.5-1.5b_gdpo_weighted`，非均匀实验则追加
+variant suffix。checkpoint、result、完成 marker 和训练日志均使用该唯一 suffix；
+base 日志仍为 `<method>.<dataset>.train.log`，sweep 日志为
+`<method>.<dataset>.<variant>.train.log`。
+
 任一 cell 失败时队列立即停止。News reward server 使用 GPU 0、1，训练使用
-GPU 2、3；每个实验只保留最新 1 个 actor checkpoint，以控制磁盘占用。
+GPU 2、3；每个实验默认保留最新 3 个 actor checkpoint，以兼顾故障回退与磁盘占用。
 
 进度记录在 `train_logs/priority_baselines/queue_progress.log`，各 cell 日志为
-`<method>.<dataset>.train.log`。
+上述唯一命名的 `.train.log`。
 
 ## Profile 与覆盖顺序
 

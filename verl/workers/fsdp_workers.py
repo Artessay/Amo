@@ -1049,27 +1049,75 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
         dist.barrier()
 
         if self._is_lora and hasattr(getattr(self, "actor_module", self.actor_module_fsdp), "peft_config"):
-            lora_save_path = os.path.join(local_path, "lora_adapter")
-            peft_model = getattr(self, "actor_module", self.actor_module_fsdp)
+            lora_save_path = None
             peft_config = {}
-            if dist.get_rank() == 0:
-                os.makedirs(lora_save_path, exist_ok=True)
-                peft_config = asdict(peft_model.peft_config.get("default", {}))
-                peft_config["task_type"] = peft_config["task_type"].value
-                peft_config["peft_type"] = peft_config["peft_type"].value
-                peft_config["target_modules"] = list(peft_config["target_modules"])
+            use_fsdp_adapter = False
+            setup_error = None
             try:
-                if fsdp_version(self.actor_module_fsdp) > 0:
+                lora_save_path = os.path.join(local_path, "lora_adapter")
+                peft_model = getattr(self, "actor_module", self.actor_module_fsdp)
+                use_fsdp_adapter = fsdp_version(self.actor_module_fsdp) > 0
+                if use_fsdp_adapter:
+                    # Moving the module can fail locally (for example, OOM).
+                    # Complete it on every rank before any rank enters the
+                    # FSDP full-parameter collective below.
                     self.actor_module_fsdp = self.actor_module_fsdp.to(get_device_name())
+                if dist.get_rank() == 0:
+                    os.makedirs(lora_save_path, exist_ok=True)
+                    peft_config = asdict(peft_model.peft_config.get("default", {}))
+                    peft_config["task_type"] = peft_config["task_type"].value
+                    peft_config["peft_type"] = peft_config["peft_type"].value
+                    peft_config["target_modules"] = list(peft_config["target_modules"])
+            except Exception as e:
+                setup_error = f"rank {dist.get_rank()}: {type(e).__name__}: {e}"
+
+            setup_errors = [None] * dist.get_world_size()
+            dist.all_gather_object(setup_errors, setup_error)
+            setup_errors = [error for error in setup_errors if error is not None]
+            if setup_errors:
+                error_message = "; ".join(setup_errors)
+                log_with_rank(
+                    f"Prepare LoRA Adapter Error ({error_message})",
+                    rank=dist.get_rank(),
+                    logger=logger,
+                    log_only_rank_0=True,
+                )
+                raise RuntimeError(f"Failed to prepare LoRA adapter checkpoint: {error_message}")
+
+            save_error = None
+            try:
+                if use_fsdp_adapter:
                     lora_params = layered_summon_lora_params(self.actor_module_fsdp)
                     if dist.get_rank() == 0:
                         save_file(lora_params, os.path.join(lora_save_path, "adapter_model.safetensors"))
                         with open(os.path.join(lora_save_path, "adapter_config.json"), "w", encoding="utf-8") as f:
                             json.dump(peft_config, f, ensure_ascii=False, indent=4)
+                        required_adapter_files = (
+                            os.path.join(lora_save_path, "adapter_model.safetensors"),
+                            os.path.join(lora_save_path, "adapter_config.json"),
+                        )
+                        missing_files = [
+                            path
+                            for path in required_adapter_files
+                            if not os.path.isfile(path) or os.path.getsize(path) == 0
+                        ]
+                        if missing_files:
+                            raise RuntimeError(f"missing or empty LoRA adapter files: {missing_files}")
             except Exception as e:
+                save_error = f"rank {dist.get_rank()}: {type(e).__name__}: {e}"
+
+            save_errors = [None] * dist.get_world_size()
+            dist.all_gather_object(save_errors, save_error)
+            save_errors = [error for error in save_errors if error is not None]
+            if save_errors:
+                error_message = "; ".join(save_errors)
                 log_with_rank(
-                    f"Save LoRA Adapter Error ({e})", rank=dist.get_rank(), logger=logger, log_only_rank_0=True
+                    f"Save LoRA Adapter Error ({error_message})",
+                    rank=dist.get_rank(),
+                    logger=logger,
+                    log_only_rank_0=True,
                 )
+                raise RuntimeError(f"Failed to save LoRA adapter: {error_message}")
 
             dist.barrier()
             log_with_rank(

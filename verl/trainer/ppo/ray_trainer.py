@@ -51,7 +51,15 @@ from verl.trainer.ppo.metric_utils import (
 )
 from verl.trainer.ppo.reward import compute_reward, compute_reward_async
 from verl.trainer.ppo.utils import Role, WorkerType, need_critic, need_reference_policy, need_reward_model
-from verl.utils.checkpoint.checkpoint_manager import find_latest_ckpt_path, should_save_ckpt_esi
+from verl.utils.checkpoint.checkpoint_manager import (
+    find_latest_ckpt_path,
+    fsync_directory,
+    mark_global_step_checkpoint_complete,
+    prune_global_step_component_checkpoints,
+    prune_global_step_checkpoints,
+    prune_unusable_global_step_checkpoints,
+    should_save_ckpt_esi,
+)
 from verl.utils.config import omega_conf_to_dataclass
 from verl.utils.debug import marked_timer
 from verl.utils.metric import reduce_metrics
@@ -81,6 +89,11 @@ def _needs_per_objective_scores(adv_estimator) -> bool:
     """True if the estimator needs the per-objective token_level_scores_dict."""
     value = adv_estimator.value if hasattr(adv_estimator, "value") else adv_estimator
     return value in AMO_PER_OBJECTIVE_ADV_ESTIMATORS
+
+
+def _ordered_amo_objective_score_keys(batch) -> list[str]:
+    """Return objective tensors in reward-function insertion order."""
+    return [key for key in batch.keys() if key.startswith("token_level_scores_")]
 
 
 @dataclass
@@ -266,7 +279,7 @@ def compute_advantage(
         response_mask = data.batch["response_mask"]
 
         # Get all reward keys that start with "token_level_scores_"
-        reward_keys = [key for key in data.batch.keys() if key.startswith("token_level_scores_")]
+        reward_keys = _ordered_amo_objective_score_keys(data.batch)
         assert len(reward_keys) > 0, "No token_level_scores_* keys found in data.batch"
 
         # Calculate advantage for each reward function
@@ -301,12 +314,13 @@ def compute_advantage(
         AdvantageEstimator.GAPO,
     ):
         # [Amo] multi-objective baselines operating on the per-objective
-        # token_level_scores_<objective> tensors. Sorting the keys keeps a stable
-        # objective ordering so weight vectors line up with the reward functions.
+        # token_level_scores_<objective> tensors. Preserve reward-manager
+        # insertion order so a configured weight vector has the same objective
+        # mapping in LS, weighted GDPO, RVPO, MGDA, and GAPO.
         from verl.trainer.ppo import amo_mo_advantages as amo_adv
 
         response_mask = data.batch["response_mask"]
-        reward_keys = sorted(k for k in data.batch.keys() if k.startswith("token_level_scores_"))
+        reward_keys = _ordered_amo_objective_score_keys(data.batch)
         assert len(reward_keys) > 0, (
             "No token_level_scores_* keys found; this estimator requires an Amo "
             "multi-objective reward manager that emits token_level_scores_dict."
@@ -889,9 +903,22 @@ class RayPPOTrainer:
     def _save_checkpoint(self):
         from verl.utils.fs import local_mkdir_safe
 
+        checkpoint_root = self.config.trainer.default_local_dir
+        local_latest_checkpointed_iteration = os.path.join(
+            checkpoint_root, "latest_checkpointed_iteration.txt"
+        )
+        previous_tracked_step = None
+        try:
+            with open(local_latest_checkpointed_iteration, encoding="utf-8") as tracker_file:
+                candidate_step = int(tracker_file.read().strip())
+            if 0 <= candidate_step <= self.global_steps:
+                previous_tracked_step = candidate_step
+        except (FileNotFoundError, OSError, ValueError):
+            pass
+
         # path: given_path + `/global_step_{global_steps}` + `/actor`
         local_global_step_folder = os.path.join(
-            self.config.trainer.default_local_dir, f"global_step_{self.global_steps}"
+            checkpoint_root, f"global_step_{self.global_steps}"
         )
 
         print(f"local_global_step_folder: {local_global_step_folder}")
@@ -915,9 +942,22 @@ class RayPPOTrainer:
         max_critic_ckpt_to_keep = (
             self.config.trainer.get("max_critic_ckpt_to_keep", None) if not remove_previous_ckpt_in_save else 1
         )
+        actor_async_save = bool(self.config.actor_rollout_ref.actor.checkpoint.get("async_save", False))
+        critic_async_save = (
+            bool(self.config.critic.checkpoint.get("async_save", False)) if self.use_critic else False
+        )
+        any_async_save = actor_async_save or critic_async_save
+
+        # Synchronous saves are rotated only after every component and the
+        # tracker are durable. The worker's legacy rotation deletes the last
+        # good checkpoint before writing its replacement. If any component is
+        # asynchronous, retain the legacy per-worker behavior because the
+        # driver cannot know when the full checkpoint is complete.
+        actor_worker_keep = max_actor_ckpt_to_keep if any_async_save else None
+        critic_worker_keep = max_critic_ckpt_to_keep if any_async_save else None
 
         self.actor_rollout_wg.save_checkpoint(
-            actor_local_path, actor_remote_path, self.global_steps, max_ckpt_to_keep=max_actor_ckpt_to_keep
+            actor_local_path, actor_remote_path, self.global_steps, max_ckpt_to_keep=actor_worker_keep
         )
 
         if self.use_critic:
@@ -930,30 +970,123 @@ class RayPPOTrainer:
                 )
             )
             self.critic_wg.save_checkpoint(
-                critic_local_path, critic_remote_path, self.global_steps, max_ckpt_to_keep=max_critic_ckpt_to_keep
+                critic_local_path, critic_remote_path, self.global_steps, max_ckpt_to_keep=critic_worker_keep
             )
 
         # save dataloader
         local_mkdir_safe(local_global_step_folder)
         dataloader_local_path = os.path.join(local_global_step_folder, "data.pt")
         dataloader_state_dict = self.train_dataloader.state_dict()
-        torch.save(dataloader_state_dict, dataloader_local_path)
+        temp_dataloader_path = (
+            f"{dataloader_local_path}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+        )
+        try:
+            with open(temp_dataloader_path, "xb") as dataloader_file:
+                torch.save(dataloader_state_dict, dataloader_file)
+                dataloader_file.flush()
+                os.fsync(dataloader_file.fileno())
+            os.replace(temp_dataloader_path, dataloader_local_path)
+            fsync_directory(local_global_step_folder)
+        finally:
+            if os.path.exists(temp_dataloader_path):
+                os.remove(temp_dataloader_path)
 
         # latest checkpointed iteration tracker (for atomic usage)
-        if (
-            hasattr(self.config.actor_rollout_ref.actor.checkpoint, "async_save")
-            and self.config.actor_rollout_ref.actor.checkpoint.async_save
-        ) or (
-            "async_save" in self.config.actor_rollout_ref.actor.checkpoint
-            and self.config.actor_rollout_ref.actor.checkpoint["async_save"]
-        ):
-            print("skip write latest_checkpointed_iteration.txt when async_save is True")
+        if any_async_save:
+            print(
+                "skip driver checkpoint tracker and full-directory rotation because "
+                "at least one checkpoint component uses async_save"
+            )
+            if max_actor_ckpt_to_keep is not None or max_critic_ckpt_to_keep is not None:
+                print(
+                    "Warning: async checkpoint retention uses legacy worker-local history "
+                    "and does not enforce the limit across resumed processes"
+                )
             return
-        local_latest_checkpointed_iteration = os.path.join(
-            self.config.trainer.default_local_dir, "latest_checkpointed_iteration.txt"
+        required_components = (
+            ("actor", str(Role.Critic)) if self.use_critic else ("actor",)
         )
-        with open(local_latest_checkpointed_iteration, "w") as f:
-            f.write(str(self.global_steps))
+        mark_global_step_checkpoint_complete(
+            checkpoint_root=checkpoint_root,
+            global_step=self.global_steps,
+            required_components=required_components,
+        )
+
+        # The old tracker is the only authoritative completion evidence for
+        # pre-marker checkpoints. Migrate that one recovery point before the
+        # tracker advances; all other unmarked folders are treated as stale.
+        if previous_tracked_step is not None and previous_tracked_step != self.global_steps:
+            try:
+                mark_global_step_checkpoint_complete(
+                    checkpoint_root=checkpoint_root,
+                    global_step=previous_tracked_step,
+                    required_components=required_components,
+                )
+            except (FileNotFoundError, RuntimeError, ValueError) as error:
+                print(
+                    "Warning: previous tracker checkpoint could not be migrated "
+                    f"and will not count toward retention: {error}"
+                )
+
+        temp_tracker = (
+            f"{local_latest_checkpointed_iteration}.tmp.{os.getpid()}.{uuid.uuid4().hex}"
+        )
+        try:
+            with open(temp_tracker, "w", encoding="utf-8") as f:
+                f.write(str(self.global_steps))
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_tracker, local_latest_checkpointed_iteration)
+            fsync_directory(checkpoint_root)
+        finally:
+            if os.path.exists(temp_tracker):
+                os.remove(temp_tracker)
+
+        # Scan the filesystem rather than process-local save history so the
+        # limit remains valid after resume. Rotation happens only after the new
+        # checkpoint and tracker are complete.
+        actor_keep = (
+            max_actor_ckpt_to_keep
+            if isinstance(max_actor_ckpt_to_keep, int)
+            and not isinstance(max_actor_ckpt_to_keep, bool)
+            and max_actor_ckpt_to_keep > 0
+            else None
+        )
+        critic_keep = (
+            max_critic_ckpt_to_keep
+            if isinstance(max_critic_ckpt_to_keep, int)
+            and not isinstance(max_critic_ckpt_to_keep, bool)
+            and max_critic_ckpt_to_keep > 0
+            else None
+        )
+        if not self.use_critic and actor_keep is not None:
+            removed_paths = prune_global_step_checkpoints(
+                checkpoint_root=checkpoint_root,
+                max_ckpt_to_keep=actor_keep,
+                current_global_step=self.global_steps,
+            )
+            for removed_path in removed_paths:
+                print(f"Removed old global checkpoint folder: {removed_path}")
+        elif self.use_critic:
+            for component, keep in (("actor", actor_keep), (str(Role.Critic), critic_keep)):
+                if keep is None:
+                    continue
+                removed_paths = prune_global_step_component_checkpoints(
+                    checkpoint_root=checkpoint_root,
+                    component=component,
+                    max_ckpt_to_keep=keep,
+                    current_global_step=self.global_steps,
+                )
+                for removed_path in removed_paths:
+                    print(f"Removed old {component} checkpoint folder: {removed_path}")
+            if actor_keep is not None or critic_keep is not None:
+                removed_paths = prune_unusable_global_step_checkpoints(
+                    checkpoint_root=checkpoint_root,
+                    current_global_step=self.global_steps,
+                    components=("actor", str(Role.Critic)),
+                )
+                for removed_path in removed_paths:
+                    print(f"Removed unusable global checkpoint folder: {removed_path}")
 
     def _load_checkpoint(self):
         if self.config.trainer.resume_mode == "disable":

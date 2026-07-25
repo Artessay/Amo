@@ -35,6 +35,7 @@ from verl.workers.reward_manager.amo_baselines.pareto import (
     fast_non_dominated_sort,
 )
 from verl.trainer.ppo import amo_mo_advantages as amo_adv
+from verl.trainer.ppo.ray_trainer import _ordered_amo_objective_score_keys
 
 
 # ----------------------------------------------------------------------
@@ -45,6 +46,17 @@ def test_normalize_weights_uniform_and_explicit():
     assert torch.allclose(w, torch.full((4,), 0.25))
     w2 = normalize_weights([1, 3], 2)
     assert torch.allclose(w2, torch.tensor([0.25, 0.75]))
+
+
+def test_objective_weight_order_matches_reward_function_insertion_order():
+    batch = {
+        "token_level_scores_coherence": object(),
+        "token_level_scores_fluency": object(),
+        "token_level_scores_relevance": object(),
+        "token_level_scores_consistency": object(),
+    }
+
+    assert _ordered_amo_objective_score_keys(batch) == list(batch)
 
 
 def test_normalize_weights_rejects_bad():

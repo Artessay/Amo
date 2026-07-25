@@ -11,10 +11,10 @@ export AMO_PY=${AMO_PY:-/home/rihongqiu/data/miniconda3/envs/amo/bin/python}
 export TRAIN_GPUS=${TRAIN_GPUS:-2,3}
 export TRAINER_LOGGER=${TRAINER_LOGGER:-'["console"]'}
 NEWS_SERVER_GPUS=${NEWS_SERVER_GPUS:-0,1}
-MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-1}
+MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}
 MODEL=${BASELINE_MODEL:-1.5b}
 
-DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo mgda gapo lagrangian fair_stable ctwa dynamic_hv nsga2 smsemoa"
+DEFAULT_METHODS="ls tchebycheff gdpo_weighted rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"
 DEFAULT_DATASETS="math-lighteval news rlla"
 METHODS_INPUT=${BASELINE_METHODS:-$DEFAULT_METHODS}
 DATASETS_INPUT=${BASELINE_DATASETS:-$DEFAULT_DATASETS}
@@ -66,8 +66,38 @@ results_dir_for_dataset() {
 
 validate_method() {
     case "$1" in
-        ls|tchebycheff|gdpo_weighted|rvpo|mgda|gapo|lagrangian|fair_stable|ctwa|dynamic_hv|nsga2|smsemoa) ;;
+        ls|tchebycheff|gdpo_weighted|rvpo|ctwa|lagrangian|fair_stable|mgda|gapo|dynamic_hv|nsga2|smsemoa) ;;
         *) echo "unsupported baseline: $1" >&2; return 1 ;;
+    esac
+}
+
+# Empty is the uniform centroid and intentionally keeps the historical artifact
+# name. LS and weighted GDPO share the same non-uniform H=2 simplex grid.
+set_cell_variants() {
+    local method=$1
+    local dataset=$2
+    CELL_VARIANTS=("")
+    if [[ $method != ls && $method != gdpo_weighted ]]; then
+        return 0
+    fi
+
+    case "$dataset" in
+        math-lighteval)
+            CELL_VARIANTS+=(h2w200 h2w020 h2w002 h2w110 h2w101 h2w011)
+            ;;
+        news)
+            CELL_VARIANTS+=(
+                h2w2000 h2w0200 h2w0020 h2w0002
+                h2w1100 h2w1010 h2w1001 h2w0110 h2w0101 h2w0011
+            )
+            ;;
+        rlla)
+            CELL_VARIANTS+=(h2w20 h2w02)
+            ;;
+        *)
+            echo "no priority weight sweep defined for dataset: $dataset" >&2
+            return 1
+            ;;
     esac
 }
 
@@ -85,6 +115,7 @@ ensure_news_server() {
 
     log "NEWS server starting on GPUs $NEWS_SERVER_GPUS -> $NEWS_LOG"
     (
+        exec 9>&-
         cd "$WORKSPACE/recipe/amo_news"
         export CUDA_VISIBLE_DEVICES=$NEWS_SERVER_GPUS
         export XFORMERS_IGNORE_FLASH_VERSION_CHECK=1
@@ -145,33 +176,51 @@ for method in "${METHODS[@]}"; do
 
         project=$(project_for_dataset "$dataset")
         results_dir=$(results_dir_for_dataset "$dataset")
-        experiment=${MODEL_TAG}_${method}
-        latest=$WORKSPACE/checkpoints/$project/$experiment/latest_checkpointed_iteration.txt
-        result_json=$WORKSPACE/results/$results_dir/$experiment.json
-        marker=$MARKER_DIR/${method}.${dataset}.done
-        train_log=$LOGDIR/${method}.${dataset}.train.log
+        set_cell_variants "$method" "$dataset"
+        for variant in "${CELL_VARIANTS[@]}"; do
+            method_tag=$method
+            cell_tag=$method.$dataset
+            cell_label=$method/$dataset
+            marker_variant=base
+            if [[ -n $variant ]]; then
+                method_tag=${method}_${variant}
+                cell_tag=$method.$dataset.$variant
+                cell_label=$method/$dataset/$variant
+                marker_variant=$variant
+            fi
 
-        if [[ -s $result_json ]]; then
-            log "SKIP $method/$dataset (canonical result exists)"
-            continue
-        fi
-        if [[ -s $marker && -s $latest ]]; then
-            log "SKIP $method/$dataset (training marker and checkpoint exist)"
-            continue
-        fi
-        if [[ $dataset == news ]]; then
-            ensure_news_server
-        fi
+            experiment=${MODEL_TAG}_${method_tag}
+            checkpoint_dir=$WORKSPACE/checkpoints/$project/$experiment
+            latest=$checkpoint_dir/latest_checkpointed_iteration.txt
+            result_json=$WORKSPACE/results/$results_dir/$experiment.json
+            marker=$MARKER_DIR/${cell_tag}.done
+            train_log=$LOGDIR/${cell_tag}.train.log
 
-        log "TRAIN $method/$dataset -> $train_log"
-        if bash "$entry" "$MODEL" "trainer.max_actor_ckpt_to_keep=$MAX_ACTOR_CKPTS" >> "$train_log" 2>&1; then
-            printf "completed time=%s checkpoint=%s\n" "$(date '+%F %T')" "$latest" > "$marker"
-            log "TRAIN ok $method/$dataset"
-        else
-            rc=$?
-            log "TRAIN FAIL $method/$dataset rc=$rc (see $train_log); queue stopping"
-            exit "$rc"
-        fi
+            if [[ -s $result_json ]]; then
+                log "SKIP $cell_label (canonical result exists)"
+                continue
+            fi
+            if [[ -s $marker && -s $latest ]]; then
+                log "SKIP $cell_label (training marker and checkpoint exist)"
+                continue
+            fi
+            if [[ $dataset == news ]]; then
+                ensure_news_server
+            fi
+
+            log "TRAIN $cell_label -> $train_log"
+            if TRAINER_VARIANT="$variant" EXPERIMENT_NAME="$experiment" CHECKPOINT_DIR="$checkpoint_dir" \
+                bash "$entry" "$MODEL" "trainer.max_actor_ckpt_to_keep=$MAX_ACTOR_CKPTS" >> "$train_log" 2>&1; then
+                printf "completed time=%s method=%s dataset=%s experiment=%s variant=%s checkpoint=%s\n" \
+                    "$(date '+%F %T')" "$method" "$dataset" "$experiment" "$marker_variant" "$latest" \
+                    > "$marker"
+                log "TRAIN ok $cell_label"
+            else
+                rc=$?
+                log "TRAIN FAIL $cell_label rc=$rc (see $train_log); queue stopping"
+                exit "$rc"
+            fi
+        done
     done
     log "=== BASELINE COMPLETE ON ALL DATASETS: $method ==="
 done

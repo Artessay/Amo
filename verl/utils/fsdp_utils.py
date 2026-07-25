@@ -574,7 +574,6 @@ def layered_summon_lora_params(fsdp_module) -> OrderedDict:
             if name.startswith(prefix) and "." not in name[len(prefix) :]:
                 yield name, submodule
 
-    lora_params = OrderedDict()
     prefix_list = [
         # fsdp
         "_fsdp_wrapped_module.base_model.model.",
@@ -587,24 +586,68 @@ def layered_summon_lora_params(fsdp_module) -> OrderedDict:
         "base_model.model.model.layers.",
         "base_model.model.model.language_model.layers.",
     ]
-    peft_model = getattr(fsdp_module, "_fsdp_wrapped_module", fsdp_module)
-    for prefix in prefix_list:
-        for name, submodule in __prefix_submodules(fsdp_module, prefix):
-            prefix = name.replace("_fsdp_wrapped_module.base_model.model.", "base_model.model.")
-            if name.endswith(".model") or name.endswith(".layers"):
-                continue
-            if fsdp_version(submodule) > 0:
-                with FSDP.summon_full_params(submodule, writeback=False):
-                    sub_lora_params = get_peft_model_state_dict(peft_model, state_dict=submodule.state_dict())
-                    sub_lora_params = {
-                        f"{prefix}.{name}": param.full_tensor().detach().cpu()
-                        if hasattr(param, "full_tensor")
-                        else param.detach().cpu()
-                        for name, param in sub_lora_params.items()
-                    }
-                    lora_params.update(sub_lora_params)
-                    submodule._is_root = False
-                get_torch_device().empty_cache()
+    work_items = []
+    work_signature = []
+    setup_error = None
+    try:
+        peft_model = getattr(fsdp_module, "_fsdp_wrapped_module", fsdp_module)
+        for search_prefix in prefix_list:
+            for name, submodule in __prefix_submodules(fsdp_module, search_prefix):
+                output_prefix = name.replace(
+                    "_fsdp_wrapped_module.base_model.model.", "base_model.model."
+                )
+                if name.endswith(".model") or name.endswith(".layers"):
+                    continue
+                if fsdp_version(submodule) > 0:
+                    work_items.append((name, output_prefix, submodule))
+                    work_signature.append((name, output_prefix))
+    except Exception as error:
+        setup_error = f"rank {dist.get_rank()}: {type(error).__name__}: {error}"
+
+    setup_states = [None] * dist.get_world_size()
+    dist.all_gather_object(
+        setup_states,
+        {"error": setup_error, "signature": work_signature},
+    )
+    setup_errors = [state["error"] for state in setup_states if state["error"] is not None]
+    if setup_errors:
+        raise RuntimeError(f"LoRA parameter collection setup failed: {'; '.join(setup_errors)}")
+    if any(state["signature"] != setup_states[0]["signature"] for state in setup_states[1:]):
+        raise RuntimeError("LoRA parameter collection order differs across ranks")
+
+    lora_params = OrderedDict()
+    for item_index, (module_name, output_prefix, submodule) in enumerate(work_items):
+        layer_error = None
+        try:
+            with FSDP.summon_full_params(submodule, writeback=False):
+                sub_lora_params = get_peft_model_state_dict(
+                    peft_model, state_dict=submodule.state_dict()
+                )
+                sub_lora_params = {
+                    f"{output_prefix}.{parameter_name}": (
+                        parameter.full_tensor().detach().cpu()
+                        if hasattr(parameter, "full_tensor")
+                        else parameter.detach().cpu()
+                    )
+                    for parameter_name, parameter in sub_lora_params.items()
+                }
+                submodule._is_root = False
+            get_torch_device().empty_cache()
+            lora_params.update(sub_lora_params)
+        except Exception as error:
+            layer_error = (
+                f"rank {dist.get_rank()} module {module_name!r}: "
+                f"{type(error).__name__}: {error}"
+            )
+
+        layer_errors = [None] * dist.get_world_size()
+        dist.all_gather_object(layer_errors, layer_error)
+        layer_errors = [error for error in layer_errors if error is not None]
+        if layer_errors:
+            raise RuntimeError(
+                f"LoRA parameter collection failed at item {item_index}: "
+                f"{'; '.join(layer_errors)}"
+            )
     return lora_params
 
 
