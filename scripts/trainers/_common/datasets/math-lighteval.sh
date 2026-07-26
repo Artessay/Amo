@@ -7,7 +7,7 @@ configure_dataset() {
     VAL_FILES=$WORKSPACE/data/MATH-LightEval/test.parquet
     REWARD_FUNCTION_PATH="['$WORKSPACE/recipe/amo_math/math_accuracy.py','$WORKSPACE/recipe/amo_math/math_conciseness.py','$WORKSPACE/recipe/amo_math/math_format.py']"
 
-    PROFILE_EPOCHS=50
+    PROFILE_EPOCHS=10
     PROFILE_TRAIN_BATCH_SIZE=512
     PROFILE_MAX_PROMPT_LENGTH=2048
     PROFILE_MAX_RESPONSE_LENGTH=2048
