@@ -30,8 +30,10 @@ DATASETS=(
 BASE_MODEL="/data/Qwen/Qwen2.5-3B-Instruct"
 EXPERIMENTS=(
     # "qwen2.5-3b_grpo"
+    "qwen2.5-3b_tchebycheff"
     # "qwen2.5-3b_gdpo"
-    "qwen2.5-3b_hvpo"
+    "qwen2.5-3b_rvpo"
+    # "qwen2.5-3b_hvpo"
 )
 
 #  BASE_MODEL="/data/meta-llama/Llama-3.2-3B-Instruct"

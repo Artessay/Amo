@@ -31,7 +31,9 @@ EXPERIMENTS=(
 
     # "qwen2.5-3b"
     # "qwen2.5-3b_grpo"
+    "qwen2.5-3b_tchebycheff"
     # "qwen2.5-3b_gdpo"
+    "qwen2.5-3b_rvpo"
     # "qwen2.5-3b_hvpo"
 
     # "llama3.2-3b"
@@ -45,8 +47,6 @@ EXPERIMENTS=(
     # "qwen2.5-1.5b_hvpo_lag1"
     # "qwen2.5-1.5b_hvpo_lag3"
     # "qwen2.5-1.5b_hvpo_lag7"
-
-    "qwen3-4b"
 )
 
 # Evaluation

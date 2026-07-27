@@ -16,8 +16,10 @@ EXPERIMENTS=(
     
     # "qwen2.5-3b"
     # "qwen2.5-3b_grpo"
+    "qwen2.5-3b_tchebycheff"
     # "qwen2.5-3b_gdpo"
-    "qwen2.5-3b_hvpo"
+    "qwen2.5-3b_rvpo"
+    # "qwen2.5-3b_hvpo"
 
     # "llama3.2-3b"
     # "llama3.2-3b_grpo"
