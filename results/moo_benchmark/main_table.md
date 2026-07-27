@@ -1,7 +1,5 @@
 # Multi-Objective Optimization Benchmark — Main Results
 
-HVPO here is the Amo project's own exclusive-hypervolume selection (`verl/workers/reward_manager/amo_utils`), plugged into a shared GA harness so that **hvpo / vanilla / chebyshev / random differ only in the survival rule**. `nsga2/nsga3/moead/smsemoa` are pymoo reference implementations. Indicators are computed in the true-Pareto-front normalized `[0,1]` objective space.
-
 - Problems: **22** (ZDT1–6, DTLZ1–7, WFG1–9), each with an exact Pareto front.
 
 - Seeds averaged per cell; **bold** = best method on that problem.
