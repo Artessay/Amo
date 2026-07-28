@@ -221,6 +221,7 @@ def compute_advantage(
     num_repeat: int = 1,
     norm_adv_by_std_in_grpo: bool = True,
     config: Optional[AlgoConfig] = None,
+    hvpo_adv_scale: float | None = None,
 ) -> DataProto:
     """Compute advantage estimates for policy optimization.
 
@@ -274,6 +275,18 @@ def compute_advantage(
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
+    elif adv_estimator == AdvantageEstimator.HVPO:
+        advantages, returns, batch_std = core_algos.compute_hvpo_outcome_advantage(
+            token_level_rewards=data.batch["token_level_rewards"],
+            response_mask=data.batch["response_mask"],
+            index=data.non_tensor_batch["uid"],
+            epsilon=config.get("hvpo_adv_scale_epsilon", 1e-6),
+            scale=hvpo_adv_scale,
+            config=config,
+        )
+        data.batch["advantages"] = advantages
+        data.batch["returns"] = returns
+        data.meta_info["hvpo_batch_difference_std"] = batch_std
     elif adv_estimator == AdvantageEstimator.GDPO:
         # Initialize the mask for GRPO calculation
         response_mask = data.batch["response_mask"]
@@ -440,6 +453,10 @@ class RayPPOTrainer:
         self.validation_generations_logger = ValidationGenerationsLogger(
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
+        )
+        self.hvpo_adv_scale: float | None = (
+            float(config.algorithm.get("hvpo_adv_scale_initial", 1.0))
+            if config.algorithm.adv_estimator == AdvantageEstimator.HVPO else None
         )
 
         # if ref_in_actor is True, the reference policy will be actor without lora applied
@@ -991,6 +1008,9 @@ class RayPPOTrainer:
             if os.path.exists(temp_dataloader_path):
                 os.remove(temp_dataloader_path)
 
+        if self.config.algorithm.adv_estimator == AdvantageEstimator.HVPO:
+            torch.save({"adv_scale": self.hvpo_adv_scale}, os.path.join(local_global_step_folder, "hvpo_state.pt"))
+
         # latest checkpointed iteration tracker (for atomic usage)
         if any_async_save:
             print(
@@ -1144,6 +1164,10 @@ class RayPPOTrainer:
             self.train_dataloader.load_state_dict(dataloader_state_dict)
         else:
             print(f"Warning: No dataloader state found at {dataloader_local_path}, will start from scratch")
+        if self.config.algorithm.adv_estimator == AdvantageEstimator.HVPO:
+            state_path = os.path.join(global_step_folder, "hvpo_state.pt")
+            if os.path.exists(state_path):
+                self.hvpo_adv_scale = torch.load(state_path, weights_only=True).get("adv_scale")
 
     def _start_profiling(self, do_profile: bool) -> None:
         """Start profiling for all worker groups if profiling is enabled."""
@@ -1504,7 +1528,15 @@ class RayPPOTrainer:
                             num_repeat=self.config.actor_rollout_ref.rollout.n,
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                             config=self.config.algorithm,
+                            hvpo_adv_scale=self.hvpo_adv_scale,
                         )
+                        if self.config.algorithm.adv_estimator == AdvantageEstimator.HVPO:
+                            current_std = float(batch.meta_info.pop("hvpo_batch_difference_std"))
+                            decay = float(self.config.algorithm.get("hvpo_adv_scale_ema_decay", 0.99))
+                            if self.hvpo_adv_scale is None:
+                                self.hvpo_adv_scale = current_std
+                            else:
+                                self.hvpo_adv_scale = decay * self.hvpo_adv_scale + (1.0 - decay) * current_std
 
                     # update critic
                     if self.use_critic:

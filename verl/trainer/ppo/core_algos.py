@@ -343,11 +343,11 @@ def compute_hvpo_outcome_advantage(
     response_mask: torch.Tensor,
     index: np.ndarray,
     epsilon: float = 1e-6,
+    scale: float | None = None,
     config: Optional[AlgoConfig] = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, float]:
     """
-    Compute advantage for HVPO, operating only on Outcome reward
-    (with only one scalar reward for each response).
+    Compute the paper's leave-one-out HVPO advantage (Eqs. 18--19).
 
     Args:
         token_level_rewards: `(torch.Tensor)`
@@ -361,16 +361,10 @@ def compute_hvpo_outcome_advantage(
         config: `(Optional[AlgoConfig])`
             algorithm configuration object
 
-    Assumptions:
-        - token_level_rewards > 0  : HV contribution (sample expanded the front)
-        - token_level_rewards < 0  : distance-based penalty (dominated sample)
-
-    The per-sample scalar reward already encodes the multi-objective credit (the
-    exclusive hypervolume contribution produced by the HVPO reward manager), so
-    the advantage uses the same group-relative baseline as GRPO: center each
-    reward by its rollout-group mean and divide by the group std. Keeping the
-    HVPO advantage identical in form to GRPO isolates the multi-objective signal
-    to the *reward*, making HVPO-vs-vanilla a clean controlled comparison.
+    ``scale`` is the standard-deviation EMA computed from batches preceding the
+    current update.  The returned third value is the current batch standard
+    deviation, which the driver uses to update that EMA only after advantages
+    for this batch have been fixed.
 
     Returns:
         advantages: `(torch.Tensor)`
@@ -378,9 +372,22 @@ def compute_hvpo_outcome_advantage(
         Returns: `(torch.Tensor)`
             shape is (bs, response_length)
     """
-    return compute_grpo_outcome_advantage(
-        token_level_rewards, response_mask, index, epsilon, True, config
-    )
+    scores = token_level_rewards.sum(dim=-1)
+    groups = defaultdict(list)
+    for i, uid in enumerate(index):
+        groups[uid].append(i)
+    differences = torch.empty_like(scores)
+    with torch.no_grad():
+        for uid, positions in groups.items():
+            if len(positions) < 2:
+                raise ValueError(f"HVPO requires at least two responses per prompt; {uid!r} has {len(positions)}")
+            values = scores[positions]
+            loo = (values.sum() - values) / (len(positions) - 1)
+            differences[positions] = values - loo
+        batch_std = float(differences.std(unbiased=False))
+        denominator = float(scale) if scale is not None else max(batch_std, epsilon)
+        advantages = (differences / (denominator + epsilon)).unsqueeze(-1) * response_mask
+    return advantages, advantages, batch_std
 
 
 @register_adv_est(AdvantageEstimator.GRPO_VECTORIZED)

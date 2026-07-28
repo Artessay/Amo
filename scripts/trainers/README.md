@@ -250,16 +250,14 @@ dry run 会完成 profile 解析、路径检查与命令组装，打印 shell-es
 bash scripts/trainers/gdpo/run_news.sh llama3b 10 --dry-run
 ```
 
-普通数据集在 dry run 时只警告缺失的数据/模型路径。PKU-SafeRLHF 的 `grpo`、`tchebycheff`、`lagrangian`、`dynamic_hv` 需要读取冻结的 `results/PKU-SafeRLHF/safe_calibration.json`，因此即使 dry run，该文件也必须存在。
+普通数据集在 dry run 时只警告缺失的数据/模型路径。PKU-SafeRLHF 的 `grpo`、`hvpo`、`tchebycheff`、`lagrangian`、`dynamic_hv` 需要读取冻结的 `results/PKU-SafeRLHF/safe_calibration.json`，因此即使 dry run，该文件也必须存在。HVPO 对 MATH、News 和 RLLA 使用奖励函数已知的 `[0,1]` 自然边界；ParaDetox 的 LaBSE cosine 维度使用 `[-1,1]`。
 
 ## HVPO 消融
 
-MATH-LightEval 提供五个独立入口，接口仍是 `[MODEL] [EPOCH] [--dry-run] [overrides...]`：
+MATH-LightEval 提供三个评测频率入口，接口仍是 `[MODEL] [EPOCH] [--dry-run] [overrides...]`：
 
 | 入口 | variant | 主要变化 |
 |---|---|---|
-| `hvpo/ablations/run_math-lighteval_distance.sh` | `distance` | `distance_metric=none` |
-| `hvpo/ablations/run_math-lighteval_euclidean.sh` | `euclidean` | `distance_metric=euclidean` |
 | `hvpo/ablations/run_math-lighteval_lag1.sh` | `lag1` | micro batch 16，`test_freq=1` |
 | `hvpo/ablations/run_math-lighteval_lag3.sh` | `lag3` | micro batch 16，`test_freq=3` |
 | `hvpo/ablations/run_math-lighteval_lag7.sh` | `lag7` | micro batch 16，`test_freq=7` |

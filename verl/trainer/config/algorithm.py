@@ -452,6 +452,9 @@ class AlgoConfig(BaseConfig):
     lam: float = 1.0
     adv_estimator: str = "gae"
     norm_adv_by_std_in_grpo: bool = True
+    hvpo_adv_scale_ema_decay: float = 0.99
+    hvpo_adv_scale_epsilon: float = 1e-6
+    hvpo_adv_scale_initial: float = 1.0
     use_kl_in_reward: bool = False
     kl_penalty: str = "kl"
     kl_ctrl: KLControlConfig = field(default_factory=KLControlConfig)
