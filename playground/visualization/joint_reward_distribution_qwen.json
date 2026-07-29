@@ -1,43 +1,4 @@
 {
-  "qwen2.5-1.5b_gdpo": {
-    "complete_source_coverage": false,
-    "harmlessness_mean_raw": 6.954890625,
-    "helpfulness_mean_raw": 5.681125,
-    "mean_rooted_singleton_hv": 1.1132948888228473,
-    "method": "GDPO",
-    "model": "qwen2.5-1.5b",
-    "n": 1000,
-    "score_cache_sha256": "a7d8f1bc70dce5b583e25cf5ce7fef4e9f9936927b32d526699e91f9bfc22ee5",
-    "source_n": 8211,
-    "source_sha256": "8214fc48f52fc505f9bb2b768a3d330f74ea5dca40c4ecb3d2e2a9e174041370",
-    "zero_hv_fraction": 0.0
-  },
-  "qwen2.5-1.5b_grpo": {
-    "complete_source_coverage": false,
-    "harmlessness_mean_raw": 7.001484375,
-    "helpfulness_mean_raw": 5.7520625,
-    "mean_rooted_singleton_hv": 1.1198443384082744,
-    "method": "GRPO",
-    "model": "qwen2.5-1.5b",
-    "n": 1000,
-    "score_cache_sha256": "1713f3ddd9c429d6c45f3d12bf90022371fe4c2a445c3c7978e9e77984019019",
-    "source_n": 8211,
-    "source_sha256": "5b0b454141aca4f48c76088278aefe0e9db8e4dca6c68cf86a96e3d2c3fb5066",
-    "zero_hv_fraction": 0.0
-  },
-  "qwen2.5-1.5b_hvpo": {
-    "complete_source_coverage": false,
-    "harmlessness_mean_raw": 6.852109375,
-    "helpfulness_mean_raw": 5.5034375,
-    "mean_rooted_singleton_hv": 1.0977627287158649,
-    "method": "HVPO",
-    "model": "qwen2.5-1.5b",
-    "n": 1000,
-    "score_cache_sha256": "1e5d7841dc56c1501b9c467859b5e90660689db3ce30a65651a991bc9f407b39",
-    "source_n": 8211,
-    "source_sha256": "e01ba2c91cb6085f56676051192c52346b377b66a62eecb25f7d7efe36c868cf",
-    "zero_hv_fraction": 0.0
-  },
   "qwen2.5-3b_gdpo": {
     "complete_source_coverage": false,
     "harmlessness_mean_raw": 6.69472265625,
