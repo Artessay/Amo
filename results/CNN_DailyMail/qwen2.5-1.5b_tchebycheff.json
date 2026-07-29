@@ -1,0 +1,16 @@
+{
+    "abisee/cnn_dailymail": {
+        "news_coherence": 0.9790668708040255,
+        "news_fluency": 0.9693127336033585,
+        "news_relevance": 0.9618875618201398,
+        "news_consistency": 0.9788789319769724,
+        "mean_vector": {
+            "news_coherence": 0.9790668708040255,
+            "news_consistency": 0.9788789319769724,
+            "news_fluency": 0.9693127336033585,
+            "news_relevance": 0.9618875618201398
+        },
+        "hypervolume": 0.972163464506004,
+        "num_prompts": 11490
+    }
+}
