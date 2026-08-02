@@ -63,6 +63,15 @@ def compute_hypervolume(vectors, ref_point=None):
     return float(HypervolumeCalculator.calculate_hypervolume(pts, ref).item())
 
 
+def compute_root_hypervolume(hypervolume, num_objectives):
+    """Return the dimension-normalized hypervolume, HV ** (1 / m)."""
+    if num_objectives < 1:
+        raise ValueError("num_objectives must be at least 1")
+    if hypervolume < 0:
+        raise ValueError("hypervolume must be non-negative")
+    return hypervolume ** (1.0 / num_objectives)
+
+
 def avg_scores_by_fn(score_lst):
     """
     Compute average scores for each reward function across all responses.
@@ -150,11 +159,13 @@ def main(config):
         fn_names = sorted(rewards[0].keys())
         vectors = [[float(r[name]) for name in fn_names] for r in rewards]
         hv = compute_hypervolume(vectors, ref_point=[0.0] * len(fn_names))
+        root_hv = compute_root_hypervolume(hv, len(fn_names))
 
         metric_dict[data_source] = {
             **avg,
             "mean_vector": {name: float(avg[name]) for name in fn_names},
             "hypervolume": hv,
+            "root_hypervolume": root_hv,
             "num_prompts": len(rewards),
         }
 
