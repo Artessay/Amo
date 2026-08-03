@@ -103,8 +103,8 @@ def calibrate_objective_vectors(vectors, calib_lower=None, calib_upper=None):
     return (points - lower) / (upper - lower)
 
 
-def load_metric_calibration(path):
-    """Load frozen affine bounds and convert an optional raw reference point."""
+def load_metric_calibration(path, objective_names=None):
+    """Load frozen affine bounds, aligned to an optional objective-name order."""
     with open(path, encoding="utf-8") as calibration_file:
         calibration = json.load(calibration_file)
 
@@ -115,6 +115,57 @@ def load_metric_calibration(path):
         raise ValueError("calibration file must contain calib_lower and calib_upper") from exc
 
     raw_reference = calibration.get("hv_reference")
+    if objective_names is not None:
+        requested_objectives = list(objective_names)
+        metadata = calibration.get("_meta")
+        calibration_objectives = (
+            metadata.get("objectives") if isinstance(metadata, dict) else None
+        )
+        if not isinstance(calibration_objectives, list) or not calibration_objectives:
+            raise ValueError(
+                "calibration file must contain a non-empty _meta.objectives list "
+                "when objective names are provided"
+            )
+        if not requested_objectives or not all(
+            isinstance(name, str) and name for name in requested_objectives
+        ):
+            raise ValueError("requested objective names must be non-empty strings")
+        if not all(
+            isinstance(name, str) and name for name in calibration_objectives
+        ):
+            raise ValueError(
+                "calibration _meta.objectives names must be non-empty strings"
+            )
+        if len(set(requested_objectives)) != len(requested_objectives):
+            raise ValueError("requested objective names must be unique")
+        if len(set(calibration_objectives)) != len(calibration_objectives):
+            raise ValueError("calibration _meta.objectives names must be unique")
+        if set(requested_objectives) != set(calibration_objectives):
+            raise ValueError(
+                "evaluation objectives do not match calibration _meta.objectives: "
+                f"evaluation={requested_objectives}, calibration={calibration_objectives}"
+            )
+        if (
+            len(lower) != len(calibration_objectives)
+            or len(upper) != len(calibration_objectives)
+        ):
+            raise ValueError(
+                "calib_lower and calib_upper dimensions must match calibration _meta.objectives"
+            )
+        if raw_reference is not None and len(raw_reference) != len(calibration_objectives):
+            raise ValueError(
+                "hv_reference dimension must match calibration _meta.objectives"
+            )
+
+        calibration_index = {
+            name: index for index, name in enumerate(calibration_objectives)
+        }
+        reorder = [calibration_index[name] for name in requested_objectives]
+        lower = [lower[index] for index in reorder]
+        upper = [upper[index] for index in reorder]
+        if raw_reference is not None:
+            raw_reference = [raw_reference[index] for index in reorder]
+
     calibrated_reference = None
     if raw_reference is not None:
         calibrated_reference = calibrate_objective_vectors(
@@ -252,7 +303,10 @@ def main(config):
         # Build per-prompt mean vectors in a stable objective order for the
         # legacy set-HV diagnostic. The formal rooted metric below uses the
         # preserved response-level vectors instead.
-        fn_names = sorted(rewards[0].keys())
+        # Reward functions are loaded from the configured path list in this
+        # insertion order. Preserve it in vectors and JSON output instead of
+        # imposing an unrelated alphabetical order.
+        fn_names = list(rewards[0].keys())
         vectors = [[float(r[name]) for name in fn_names] for r in rewards]
 
         metrics_config = config.get("metrics", {})
@@ -267,7 +321,8 @@ def main(config):
                     "set either metrics.calibration_path or inline calibration bounds, not both"
                 )
             calib_lower, calib_upper, file_reference = load_metric_calibration(
-                calibration_path
+                calibration_path,
+                objective_names=fn_names,
             )
             if ref_point is None:
                 ref_point = file_reference

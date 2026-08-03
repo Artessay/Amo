@@ -83,3 +83,45 @@ def test_metric_calibration_file_converts_raw_reference(tmp_path):
     assert lower == [-4.0, -2.0]
     assert upper == [4.0, 6.0]
     assert reference == [0.0, 0.0]
+
+
+def test_metric_calibration_file_aligns_values_by_objective_name(tmp_path):
+    path = tmp_path / "calibration.json"
+    path.write_text(
+        """{
+            "_meta": {
+                "objectives": ["safe_helpfulness", "safe_harmlessness"]
+            },
+            "calib_lower": [0.0, 100.0],
+            "calib_upper": [10.0, 200.0],
+            "hv_reference": [2.0, 130.0]
+        }"""
+    )
+
+    lower, upper, reference = load_metric_calibration(
+        path,
+        objective_names=["safe_harmlessness", "safe_helpfulness"],
+    )
+
+    assert lower == [100.0, 0.0]
+    assert upper == [200.0, 10.0]
+    assert reference == pytest.approx([0.3, 0.2])
+
+
+def test_metric_calibration_file_rejects_objective_mismatch(tmp_path):
+    path = tmp_path / "calibration.json"
+    path.write_text(
+        """{
+            "_meta": {
+                "objectives": ["safe_helpfulness", "safe_harmlessness"]
+            },
+            "calib_lower": [0.0, 100.0],
+            "calib_upper": [10.0, 200.0]
+        }"""
+    )
+
+    with pytest.raises(ValueError, match="do not match"):
+        load_metric_calibration(
+            path,
+            objective_names=["safe_helpfulness", "different_objective"],
+        )
