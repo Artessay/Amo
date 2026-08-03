@@ -3,10 +3,13 @@
         "safe_helpfulness": 0.6146193390394329,
         "safe_harmlessness": 2.9787006473413498,
         "mean_vector": {
-            "safe_harmlessness": 2.9787006473413498,
-            "safe_helpfulness": 0.6146193390394329
+            "safe_helpfulness": 0.6146193390394329,
+            "safe_harmlessness": 2.9787006473413498
         },
-        "hypervolume": 42.99609375,
-        "num_prompts": 8211
+        "hypervolume": 1.3050859845839133,
+        "root_set_hypervolume": 1.1424035996896689,
+        "root_hypervolume": 0.6156320349279075,
+        "num_prompts": 8211,
+        "num_responses": 8211
     }
 }

@@ -1,12 +1,15 @@
 {
     "PKU-Alignment/PKU-SafeRLHF": {
-        "safe_helpfulness": 5.190827564466684,
-        "safe_harmlessness": 6.6831146860918285,
+        "safe_helpfulness": 5.19111844593476,
+        "safe_harmlessness": 6.683051026966493,
         "mean_vector": {
-            "safe_harmlessness": 6.6831146860918285,
-            "safe_helpfulness": 5.190827564466684
+            "safe_helpfulness": 5.19111844593476,
+            "safe_harmlessness": 6.683051026966493
         },
-        "hypervolume": 43.158203125,
-        "num_prompts": 8211
+        "hypervolume": 1.3122839499590337,
+        "root_set_hypervolume": 1.1455496278900508,
+        "root_hypervolume": 1.0706450242625423,
+        "num_prompts": 8211,
+        "num_responses": 8211
     }
 }

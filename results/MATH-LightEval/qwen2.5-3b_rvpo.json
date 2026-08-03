@@ -9,6 +9,9 @@
             "math_format": 0.8216
         },
         "hypervolume": 1.0,
-        "num_prompts": 5000
+        "root_set_hypervolume": 1.0,
+        "root_hypervolume": 0.3859493280791272,
+        "num_prompts": 5000,
+        "num_responses": 5000
     }
 }
