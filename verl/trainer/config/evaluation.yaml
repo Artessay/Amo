@@ -9,6 +9,15 @@ custom_reward_function:
   path: null
   name: compute_score
 
+# Metrics are computed after an optional frozen affine calibration. Natural
+# [0, 1] objectives can leave both bounds null. For raw reward-model scores,
+# pass the same bounds for every method being compared.
+metrics:
+  calibration_path: null
+  calib_lower: null
+  calib_upper: null
+  reference_point: null
+
 ray_kwargs:
   ray_init:
     num_cpus: null # `None` means using all CPUs, which might cause hang if limited in systems like SLURM. Please set to a number allowed then.

@@ -41,4 +41,5 @@ echo "[eval] scoring + hypervolume"
 XFORMERS_IGNORE_FLASH_VERSION_CHECK=1 $PY -m verl.trainer.amo_eval \
     data.path=$OUT \
     data.reward_model_key=extra_info \
+    metrics.calibration_path=$WORKSPACE/results/$DATASET/safe_calibration.json \
     custom_reward_function.path=$REWARD_FUNCTION_PATH

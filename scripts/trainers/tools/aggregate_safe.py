@@ -18,7 +18,7 @@ results/PKU-SafeRLHF/baselines_table.md summarizing, per model x method:
 
   * safe_helpfulness (mean over test prompts),
   * safe_harmlessness (mean over test prompts),
-  * hypervolume (dominated HV at ref = origin, as computed by amo_eval),
+  * root_hypervolume (mean response-level rooted singleton HV),
   * num_prompts.
 
 Re-runnable at any time; safe to call after every completed cell. Methods and
@@ -117,10 +117,11 @@ def main():
     lines = []
     lines.append("# PKU-SafeRLHF multi-objective baselines\n")
     lines.append(
-        "Per-objective test means and dominated hypervolume (HV, ref = origin) "
-        "for each model x method. Higher is better on all columns. Objectives are "
+        "Per-objective test means and mean response-level rooted singleton "
+        "hypervolume for each model x method. Higher is better on all columns. Objectives are "
         "the Safe-RLHF reward-model scores `safe_helpfulness` and "
-        "`safe_harmlessness`. Empty cells are not-yet-run.\n"
+        "`safe_harmlessness`; rooted HV uses the shared frozen calibration. "
+        "Empty cells are not-yet-run.\n"
     )
     lines.append(
         "> Controlled comparison: every method shares the identical base model, "
@@ -132,7 +133,7 @@ def main():
 
     for tag, pretty in MODELS:
         lines.append(f"\n## {pretty}\n")
-        lines.append("| Method | Helpfulness | Harmlessness | Hypervolume | #prompts |")
+        lines.append("| Method | Helpfulness | Harmlessness | Rooted HV | #prompts |")
         lines.append("|---|---|---|---|---|")
         for method in METHODS:
             exp = f"{tag}_{method}"
@@ -143,7 +144,7 @@ def main():
                 continue
             help_ = metrics.get("safe_helpfulness")
             harm = metrics.get("safe_harmlessness")
-            hv = metrics.get("hypervolume")
+            hv = metrics.get("root_hypervolume")
             n = metrics.get("num_prompts")
             lines.append(
                 f"| {label} | {fmt(help_)} | {fmt(harm)} | {fmt(hv, 4)} | "

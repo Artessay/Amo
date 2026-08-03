@@ -30,5 +30,6 @@ for EXPERIMENT_NAME in "${EXPERIMENTS[@]}"; do
     python3 -m verl.trainer.amo_eval \
         data.path=$OUTPUT_PATH \
         data.reward_model_key=extra_info \
+        metrics.calibration_path=$WORKSPACE/results/$DATASET/safe_calibration.json \
         custom_reward_function.path=$REWARD_FUNCTION_PATH 
 done

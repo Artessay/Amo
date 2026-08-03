@@ -155,10 +155,11 @@ PKU cell 前检查 helpful RM 的 `50051` 和 harmless CM 的 `50052`；若本�
 GPU 2、3。端口、host 与 GPU 可通过 `HELPFUL_TARGET_*`、`HARMLESS_TARGET_*`、
 `SAFE_SERVER_GPUS` 和 `NEWS_SERVER_GPUS` 覆盖。
 
-> PKU 训练可以先进行，但当前 `amo_eval` 的 raw-logit、origin-reference、
-> pooled-prompt HV 不可作为正式主结论。正式评测应使用同一份 frozen calibration，
-> 在 policy mean/front 上计算 HV；另一种有效口径是对每个 prompt 生成 `n > 1`
-> responses 后计算 response-set HV，而不是把不同 prompt 混成一张前沿。
+> PKU 正式评测通过 `metrics.calibration_path` 复用同一份 frozen calibration；
+> `amo_eval` 输出的 `root_hypervolume` 是逐响应计算后按 prompt 平均的 rooted
+> singleton HV。`hypervolume` 与 `root_set_hypervolume` 仍是 pooled-prompt set-HV
+> 诊断，不可作为正式主结论。若研究每个 prompt 的候选集合覆盖度，应对每个 prompt
+> 生成 `n > 1` responses 并分别计算 response-set HV，而不是混合不同 prompts。
 
 任一 cell 失败时队列立即停止；每个实验默认保留最新 3 个 actor checkpoint，以兼顾
 故障回退与磁盘占用。

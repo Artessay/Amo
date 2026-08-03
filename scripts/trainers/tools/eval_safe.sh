@@ -1,6 +1,6 @@
 #!/bin/bash
 # [Amo] Offline evaluation for one PKU-SafeRLHF experiment:
-#   merge LoRA -> generate responses -> amo_eval (per-objective means + HV).
+#   merge LoRA -> generate responses -> amo_eval (means + rooted singleton HV).
 #
 # This pins all work to GPU 0,1 and lowers vLLM gpu_memory_utilization so
 # generation can coexist with the reward gRPC servers already resident on
@@ -79,9 +79,10 @@ echo "[eval] generating responses -> $OUT"
 XFORMERS_IGNORE_FLASH_VERSION_CHECK=1 "$PY" "$WORKSPACE/playground/generation.py" \
     --model "$MERGE" --data "$DATA" --output "$OUT" --max_tokens 512 --gpu_mem_util "$GPU_MEM_UTIL"
 
-# 3) amo_eval: reuse reward servers for scoring + compute hypervolume.
-echo "[eval] scoring + hypervolume -> ${OUT%.parquet}.json"
+# 3) Reuse reward servers and the frozen calibration for rooted-HV scoring.
+echo "[eval] scoring + rooted hypervolume -> ${OUT%.parquet}.json"
 XFORMERS_IGNORE_FLASH_VERSION_CHECK=1 "$PY" -m verl.trainer.amo_eval \
     data.path="$OUT" \
     data.reward_model_key=extra_info \
+    metrics.calibration_path="$WORKSPACE/results/$DATASET/safe_calibration.json" \
     custom_reward_function.path="$REWARD_FUNCTION_PATH"
