@@ -1,0 +1,19 @@
+{
+    "abisee/cnn_dailymail": {
+        "news_coherence": 0.9008710220378945,
+        "news_fluency": 0.9371425853870283,
+        "news_relevance": 0.9079481955495726,
+        "news_consistency": 0.7992651863106475,
+        "mean_vector": {
+            "news_coherence": 0.9008710220378945,
+            "news_fluency": 0.9371425853870283,
+            "news_relevance": 0.9079481955495726,
+            "news_consistency": 0.7992651863106475
+        },
+        "hypervolume": 0.9405945741182409,
+        "root_set_hypervolume": 0.9848058444181066,
+        "root_hypervolume": 0.8778549369692291,
+        "num_prompts": 11490,
+        "num_responses": 11490
+    }
+}
