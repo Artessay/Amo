@@ -1,0 +1,17 @@
+{
+    "DigitalLearningGmbH/MATH-lighteval": {
+        "math_accuracy": 0.5091379037228482,
+        "math_conciseness": 0.42807091024939964,
+        "math_format": 0.999,
+        "mean_vector": {
+            "math_accuracy": 0.5091379037228482,
+            "math_conciseness": 0.42807091024939964,
+            "math_format": 0.999
+        },
+        "hypervolume": 1.0,
+        "root_set_hypervolume": 1.0,
+        "root_hypervolume": 0.4345182669064299,
+        "num_prompts": 5000,
+        "num_responses": 5000
+    }
+}

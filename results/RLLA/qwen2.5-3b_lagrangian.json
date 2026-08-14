@@ -1,0 +1,15 @@
+{
+    "rlla": {
+        "tool_correctness": 0.7579602688977689,
+        "tool_format": 0.525,
+        "mean_vector": {
+            "tool_correctness": 0.7579602688977689,
+            "tool_format": 0.525
+        },
+        "hypervolume": 0.5,
+        "root_set_hypervolume": 0.7071067811865476,
+        "root_hypervolume": 0.5713204252315182,
+        "num_prompts": 80,
+        "num_responses": 80
+    }
+}

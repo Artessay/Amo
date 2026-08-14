@@ -1,0 +1,15 @@
+{
+    "PKU-Alignment/PKU-SafeRLHF": {
+        "safe_helpfulness": 5.930059523809524,
+        "safe_harmlessness": 7.092083028863719,
+        "mean_vector": {
+            "safe_helpfulness": 5.930059523809524,
+            "safe_harmlessness": 7.092083028863719
+        },
+        "hypervolume": 1.3083097400023815,
+        "root_set_hypervolume": 1.1438136823811742,
+        "root_hypervolume": 1.1347994401657082,
+        "num_prompts": 8211,
+        "num_responses": 8211
+    }
+}
