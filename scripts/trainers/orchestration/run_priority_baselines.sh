@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run Qwen2.5-1.5B baselines in strict priority order. The method loop is
+# Run Qwen2.5 baselines in strict priority order. The method loop is
 # deliberately outside the dataset loop: a baseline must finish every selected
 # dataset before the next baseline can start. Any cell failure stops the queue.
 set -euo pipefail
@@ -20,8 +20,11 @@ SAFE_HELPFUL_MODEL_PATH=${SAFE_HELPFUL_MODEL_PATH:-$WORKSPACE/playground/reward_
 SAFE_HARMLESS_MODEL_PATH=${SAFE_HARMLESS_MODEL_PATH:-$WORKSPACE/playground/reward_model/checkpoints/Qwen2.5-7B-SafeRLHF-CM}
 MAX_ACTOR_CKPTS=${MAX_ACTOR_CKPTS:-3}
 MODEL=${BASELINE_MODEL:-1.5b}
+ENABLE_WEIGHT_SWEEPS=${ENABLE_WEIGHT_SWEEPS:-0}
+QUEUE_NAME=${BASELINE_QUEUE_NAME:-default}
+[[ $QUEUE_NAME =~ ^[A-Za-z0-9._-]+$ ]] || { echo "invalid BASELINE_QUEUE_NAME: $QUEUE_NAME" >&2; exit 2; }
 
-DEFAULT_METHODS="grpo tchebycheff rvpo ctwa lagrangian fair_stable mgda gapo dynamic_hv nsga2 smsemoa"
+DEFAULT_METHODS="dynamic_hv grpo gdpo rvpo tchebycheff ctwa lagrangian fair_stable mgda gapo nsga2 smsemoa"
 DEFAULT_DATASETS="math-lighteval pku-saferlhf rlla"
 METHODS_INPUT=${BASELINE_METHODS:-$DEFAULT_METHODS}
 DATASETS_INPUT=${BASELINE_DATASETS:-$DEFAULT_DATASETS}
@@ -32,12 +35,14 @@ read -r -a DATASETS <<< "$DATASETS_INPUT"
 
 case "$MODEL" in
     1.5b|qwen2.5-1.5b) MODEL_TAG=qwen2.5-1.5b ;;
-    *) echo "priority baseline queue only supports Qwen2.5-1.5B; got: $MODEL" >&2; exit 2 ;;
+    3b|qwen2.5-3b) MODEL_TAG=qwen2.5-3b ;;
+    *) echo "priority baseline queue only supports Qwen2.5-1.5B/3B; got: $MODEL" >&2; exit 2 ;;
 esac
 [[ $MAX_ACTOR_CKPTS =~ ^[1-9][0-9]*$ ]] || { echo "MAX_ACTOR_CKPTS must be positive" >&2; exit 2; }
 
-LOGDIR=$WORKSPACE/train_logs/priority_baselines
+LOGDIR=$WORKSPACE/train_logs/priority_baselines/$MODEL_TAG/$QUEUE_NAME
 MARKER_DIR=$LOGDIR/completed_train
+SHARED_MARKER_DIR=$WORKSPACE/train_logs/priority_baselines/$MODEL_TAG/completed_train
 LEDGER=$LOGDIR/queue_progress.log
 STATUS_FILE=$LOGDIR/queue.status
 NEWS_LOG=$LOGDIR/news_server.log
@@ -77,7 +82,7 @@ results_dir_for_dataset() {
 
 validate_method() {
     case "$1" in
-        grpo|tchebycheff|rvpo|ctwa|lagrangian|fair_stable|mgda|gapo|dynamic_hv|nsga2|smsemoa) ;;
+        grpo|gdpo|tchebycheff|rvpo|ctwa|lagrangian|fair_stable|mgda|gapo|dynamic_hv|nsga2|smsemoa) ;;
         *) echo "unsupported baseline: $1" >&2; return 1 ;;
     esac
 }
@@ -88,7 +93,7 @@ set_cell_variants() {
     local method=$1
     local dataset=$2
     CELL_VARIANTS=("")
-    if [[ $method != grpo ]]; then
+    if [[ $method != grpo || $ENABLE_WEIGHT_SWEEPS != 1 ]]; then
         return 0
     fi
 
@@ -316,7 +321,8 @@ for method in "${METHODS[@]}"; do
                 log "SKIP $cell_label (canonical result exists)"
                 continue
             fi
-            if [[ -s $marker && -s $latest ]]; then
+            shared_marker=$SHARED_MARKER_DIR/${cell_tag}.done
+            if [[ ( -s $marker || -s $shared_marker ) && -s $latest ]]; then
                 log "SKIP $cell_label (training marker and checkpoint exist)"
                 continue
             fi
